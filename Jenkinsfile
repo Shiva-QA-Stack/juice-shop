@@ -104,14 +104,18 @@ pipeline {
                 always {
                     script {
                         sh '''
-                            sleep 10
-                            # Extract Sonar summary for AI dashboard
+                            sleep 15
+                            # Fetch Full Detailed SonarQube Findings (Up to 100 entries)
+                            curl -s -u "${SONAR_TOKEN}:" \
+                                "${SONAR_URL}/api/issues/search?projectKeys=${SONAR_PROJECT_KEY}&severities=CRITICAL,BLOCKER,MAJOR&resolved=false&ps=100" \
+                                > ${REPORTS_DIR}/sonar-issues.json
+                            
+                            # Keep simple count for summary metrics
                             SONAR_CRITICAL=$(curl -s -u "${SONAR_TOKEN}:" \
                                 "${SONAR_URL}/api/issues/search?projectKeys=${SONAR_PROJECT_KEY}&severities=CRITICAL,BLOCKER&resolved=false" \
                                 | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('total',0))" 2>/dev/null || echo "0")
                             
-                            # Using 'npm-audit.json' as the source for SCA results now
-                            echo "{\\"critical\\": ${SONAR_CRITICAL}, \\"major\\": 0, \\"minor\\": 0}" > ${REPORTS_DIR}/sonar-summary.json
+                            echo "{\\"critical\\": ${SONAR_CRITICAL}, \\"major\\": 0}" > ${REPORTS_DIR}/sonar-summary.json
                         '''
                     }
                 }
@@ -146,11 +150,12 @@ pipeline {
                     # Fix permissions for the zap user inside the container
                     chmod -R 777 ${REPORTS_DIR}
                     
+                    echo "🚀 Starting Deep ZAP Full Scan (Active Attacks)..."
                     docker run --rm \
                         --network host \
                         -v ${REPORTS_DIR}:/zap/wrk:rw \
                         ghcr.io/zaproxy/zaproxy:stable \
-                        zap-baseline.py \
+                        zap-full-scan.py \
                             -t ${APP_URL} \
                             -r zap-report.html \
                             -J zap-report.json \
