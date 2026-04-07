@@ -21,7 +21,7 @@ pipeline {
         stage('Git Checkout') {
             steps {
                 echo "📦 Cloning Juice Shop repository..."
-                git branch: 'master', url: 'https://github.com/infostudent786/juice-shop.git'
+                git branch: 'master', url: 'https://github.com/juice-shop/juice-shop.git'
                 sh 'mkdir -p ${REPORTS_DIR}'
                 // Note: jmeter-test.jmx and ai-dashboard.py should already exist in the repo root
             }
@@ -49,8 +49,8 @@ pipeline {
             steps {
                 echo "⚙️ Installing Node.js dependencies and building project..."
                 sh '''
+                    # 'npm install' on Juice Shop automatically runs 'npm run build' via postinstall
                     npm install --legacy-peer-deps
-                    npm run build || echo "Build completed with warnings (ignored for CI)."
                 '''
             }
         }
@@ -58,17 +58,19 @@ pipeline {
         stage('SCA — OWASP Dependency Check') {
             steps {
                 echo "🔍 Running OWASP Dependency Check (SCA)..."
-                sh '''
-                    if [ ! -f package-lock.json ]; then
-                        echo "Generating package-lock.json..."
-                        npm install --package-lock-only
-                    fi
-                '''
-                dependencyCheck(
-                    additionalArguments: '--scan . --format ALL --out ${REPORTS_DIR} --disableAssembly',
-                    odcInstallation: 'owasp'
-                )
-                dependencyCheckPublisher pattern: 'reports/dependency-check-report.xml'
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh '''
+                        if [ ! -f package-lock.json ]; then
+                            echo "Generating package-lock.json..."
+                            npm install --package-lock-only
+                        fi
+                    '''
+                    dependencyCheck(
+                        additionalArguments: '--scan . --format ALL --out ${REPORTS_DIR} --disableAssembly',
+                        odcInstallation: 'owasp'
+                    )
+                    dependencyCheckPublisher pattern: 'reports/dependency-check-report.xml'
+                }
             }
         }
 
@@ -129,6 +131,9 @@ pipeline {
             steps {
                 echo "🕷️ Running OWASP ZAP Baseline Scan via Docker..."
                 sh '''
+                    # Fix permissions for the zap user inside the container
+                    chmod -R 777 ${REPORTS_DIR}
+                    
                     docker run --rm \
                         --network host \
                         -v ${REPORTS_DIR}:/zap/wrk:rw \
