@@ -17,24 +17,22 @@ def load_json(filename):
             print(f"Error loading {filename}: {e}")
     return None
 
-def parse_dependency_check(filename):
+def parse_npm_audit(filename):
     path = os.path.join(REPORTS_DIR, filename)
     sca_summary = {"total": 0, "critical": 0, "high": 0, "medium": 0, "low": 0}
     if os.path.exists(path):
         try:
-            tree = ET.parse(path)
-            root = tree.getroot()
-            ns = {'ns': 'https://jeremylong.github.io/DependencyCheck/dependency-check.2.5.xsd'}
-            for dependency in root.findall('.//ns:dependency', ns):
-                vulnerabilities = dependency.find('ns:vulnerabilities', ns)
-                if vulnerabilities is not None:
-                    for v in vulnerabilities.findall('ns:vulnerability', ns):
-                        sca_summary["total"] += 1
-                        severity = v.find('ns:severity', ns).text
-                        if severity == "CRITICAL": sca_summary["critical"] += 1
-                        elif severity == "HIGH": sca_summary["high"] += 1
-                        elif severity == "MEDIUM": sca_summary["medium"] += 1
-                        elif severity == "LOW": sca_summary["low"] += 1
+            with open(path, 'r') as f:
+                data = json.load(f)
+                
+                # Check for metadata structure (npm 7+)
+                if "metadata" in data and "vulnerabilities" in data["metadata"]:
+                    vulns = data["metadata"]["vulnerabilities"]
+                    sca_summary["critical"] = vulns.get("critical", 0)
+                    sca_summary["high"] = vulns.get("high", 0)
+                    sca_summary["medium"] = vulns.get("moderate", 0) # npm uses 'moderate'
+                    sca_summary["low"] = vulns.get("low", 0)
+                    sca_summary["total"] = vulns.get("total", 0)
         except Exception as e:
             print(f"Error parsing {filename}: {e}")
     return sca_summary
@@ -78,7 +76,8 @@ def parse_jmeter_results(filename):
 
 def generate_dashboard():
     # 1. Parse all results
-    sca = parse_dependency_check("dependency-check-report.xml")
+    # Switching from OWASP XML to NPM Audit JSON for speed
+    sca = parse_npm_audit("npm-audit.json")
     zap = parse_zap_report("zap-report.json")
     perf = parse_jmeter_results("jmeter-results.jtl")
     # For Sonar, we'll assume a summary is provided or we'll mock it if not available
@@ -211,7 +210,7 @@ def generate_dashboard():
 
             <div class="data-section">
                 <div class="table-wrap">
-                    <h3>SCA Vulnerabilities</h3>
+                    <h3>SCA Vulnerabilities (npm audit)</h3>
                     <table>
                         <tr><th>Severity</th><th>Progress</th><th>Count</th></tr>
                         <tr><td>Critical</td><td><div class="bar-container"><div class="bar-fill" style="width: {min(100, sca['critical']*20)}%; background: var(--error);"></div></div></td><td>{sca['critical']}</td></tr>
