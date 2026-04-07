@@ -101,129 +101,138 @@ def generate_dashboard():
     if perf["avg_rt"] > 1000:
         recommendations.append({"priority": "LOW", "issue": "High average response latency", "fix": "Investigate frontend bundling and API response times."})
 
-    # 3. Build HTML
+    # 3. Build HTML (Ultra-Premium Aesthetics)
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>DevSecOps AI Dashboard</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DevSecOps Intelligence Suite — AI Dashboard</title>
         <style>
-            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }}
-            .container {{ max-width: 1200px; margin: auto; }}
-            header {{ text-align: center; padding-bottom: 40px; border-bottom: 2px solid #1e293b; margin-bottom: 40px; }}
-            h1 {{ color: #38bdf8; margin: 0; font-size: 2.5rem; }}
-            .summary-cards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 40px; }}
-            .card {{ background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }}
-            .card h3 {{ margin-top: 0; color: #94a3b8; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }}
-            .card div {{ font-size: 2rem; font-weight: bold; color: #f1f5f9; }}
-            .card.risk-CRITICAL {{ border-left: 5px solid #ef4444; }}
-            .card.risk-HIGH {{ border-left: 5px solid #f97316; }}
-            .card.risk-MEDIUM {{ border-left: 5px solid #facc15; }}
-            .card.risk-LOW {{ border-left: 5px solid #22c55e; }}
-            .ai-section {{ background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 30px; border-radius: 16px; border: 1px solid #38bdf8; margin-bottom: 40px; }}
-            .ai-title {{ display: flex; align-items: center; font-size: 1.5rem; font-weight: bold; margin-bottom: 20px; color: #38bdf8; }}
-            .ai-title span {{ margin-right: 10px; font-size: 2rem; }}
-            .recommendation-item {{ background: #334155; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 15px; border-left: 4px solid #38bdf8; }}
-            .rec-priority {{ font-weight: bold; color: #38bdf8; min-width: 80px; }}
-            .rec-content {{ flex-grow: 1; }}
-            .rec-fix {{ font-size: 0.85rem; color: #94a3b8; margin-top: 5px; }}
-            .details-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px; }}
-            table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
-            th, td {{ text-align: left; padding: 12px; border-bottom: 1px solid #334155; }}
-            th {{ color: #94a3b8; font-size: 0.85rem; }}
-            .footer {{ text-align: center; margin-top: 50px; color: #64748b; font-size: 0.8rem; }}
-            .status-tag {{ padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }}
-            .status-RED {{ background: #ef4444; color: white; }}
-            .status-YELLOW {{ background: #facc15; color: #0f172a; }}
-            .status-GREEN {{ background: #22c55e; color: white; }}
+            @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
+            :root {{
+                --bg: #030712; --card: rgba(30, 41, 59, 0.7); --border: rgba(51, 65, 85, 0.5);
+                --primary: #22d3ee; --success: #34d399; --warning: #fbbf24; --error: #fb7185; --text: #f8fafc;
+            }}
+            body {{ font-family: 'Outfit', sans-serif; background: radial-gradient(circle at top left, #1e1b4b, #030712); color: var(--text); margin: 0; padding: 0; min-height: 100vh; overflow-x: hidden; }}
+            .container {{ max-width: 1400px; margin: auto; padding: 40px 20px; }}
+            
+            /* Glassmorphism Header */
+            header {{ 
+                display: flex; justify-content: space-between; align-items: center; padding-bottom: 40px; margin-bottom: 60px;
+                border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 100;
+            }}
+            h1 {{ font-size: 2.2rem; font-weight: 700; background: linear-gradient(90deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0; }}
+            .timestamp {{ font-size: 0.9rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; }}
+            
+            /* Metric Grid */
+            .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-bottom: 60px; }}
+            .stat-card {{ 
+                background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 35px;
+                backdrop-filter: blur(8px); position: relative; overflow: hidden; transition: transform 0.3s;
+            }}
+            .stat-card:hover {{ transform: translateY(-8px); border-color: var(--primary); }}
+            .stat-card h3 {{ font-size: 1rem; color: #94a3b8; margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 0.05em; }}
+            .stat-value {{ font-size: 3.5rem; font-weight: 700; color: #fff; line-height: 1; }}
+            .stat-card.risk-CRITICAL {{ border-top: 6px solid var(--error); }}
+            .stat-card.risk-HIGH {{ border-top: 6px solid #f97316; }}
+            .stat-card.risk-LOW {{ border-top: 6px solid var(--success); }}
+            
+            /* AI Insights Section */
+            .ai-block {{ 
+                background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border-radius: 32px; padding: 45px; 
+                border: 1px solid var(--primary); box-shadow: 0 0 40px rgba(34, 211, 238, 0.2); margin-bottom: 60px;
+            }}
+            .ai-badge {{ background: var(--primary); color: #000; padding: 6px 16px; border-radius: 99px; font-weight: bold; font-size: 0.8rem; vertical-align: middle; }}
+            .rec-list {{ margin-top: 30px; }}
+            .rec-card {{ background: rgba(255, 255, 255, 0.03); padding: 25px; border-radius: 20px; border: 1px solid var(--border); margin-bottom: 20px; display: flex; align-items: start; gap: 20px; }}
+            .rec-icon {{ font-size: 1.5rem; width: 40px; }}
+            .rec-body h4 {{ margin: 0 0 5px 0; font-size: 1.1rem; color: #fff; }}
+            .rec-fix {{ font-size: 0.9rem; color: var(--primary); margin-top: 10px; font-weight: 600; opacity: 0.8; }}
+            
+            /* Tables */
+            .data-section {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 40px; }}
+            .table-wrap {{ background: var(--card); border-radius: 24px; padding: 30px; border: 1px solid var(--border); }}
+            table {{ width: 100%; border-collapse: collapse; }}
+            th {{ text-align: left; padding: 15px; font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; border-bottom: 1px solid var(--border); }}
+            td {{ padding: 18px 15px; font-size: 1rem; color: #f1f5f9; border-bottom: 1px solid rgba(255,255,255,0.05); }}
+            .bar-container {{ width: 100px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; display: inline-block; margin-right: 15px; vertical-align: middle; }}
+            .bar-fill {{ height: 100%; border-radius: 3px; }}
         </style>
     </head>
     <body>
         <div class="container">
             <header>
-                <h1>DevSecOps Intelligence Suite</h1>
-                <p>Security Analysis & Performance Report | Last Updated: {now}</p>
+                <div>
+                    <h1>Security Intelligence Suite</h1>
+                    <p class="timestamp">Session: {now} | Target: 65.1.109.17</p>
+                </div>
+                <div class="ai-badge">GEN-AI ANALYST v2.0</div>
             </header>
 
-            <div class="summary-cards">
-                <div class="card risk-{risk_level}">
-                    <h3>Overall Risk Profile</h3>
-                    <div>{risk_level}</div>
+            <div class="grid">
+                <div class="stat-card risk-{risk_level}">
+                    <h3>Risk Posture</h3>
+                    <div class="stat-value">{risk_level}</div>
                 </div>
-                <div class="card">
-                    <h3>SAST/SCA Issues</h3>
-                    <div>{sca['critical'] + sca['high'] + sonar['critical']}</div>
+                <div class="stat-card">
+                    <h3>Code/SCA Vulnerabilities</h3>
+                    <div class="stat-value">{sca['critical'] + sca['high'] + sonar['critical']}</div>
                 </div>
-                <div class="card">
-                    <h3>DAST (ZAP) High/Med</h3>
-                    <div>{zap['high'] + zap['medium']}</div>
+                <div class="stat-card">
+                    <h3>ZAP High Alerts</h3>
+                    <div class="stat-value">{zap['high']}</div>
                 </div>
-                <div class="card">
-                    <h3>Performance (Avg RT)</h3>
-                    <div>{int(perf['avg_rt'])}ms</div>
+                <div class="stat-card">
+                    <h3>Performance (Avg)</h3>
+                    <div class="stat-value">{int(perf['avg_rt'])}<span style="font-size: 1.5rem; color: #94a3b8;">ms</span></div>
                 </div>
             </div>
 
-            <div class="ai-section">
-                <div class="ai-title"><span>🤖</span> AI Security Analyst — Insights</div>
-                {''.join([f'''
-                <div class="recommendation-item">
-                    <div class="rec-priority">{r['priority']}</div>
-                    <div class="rec-content">
-                        <strong>{r['issue']}</strong>
-                        <div class="rec-fix">Recommended Fix: {r['fix']}</div>
+            <div class="ai-block">
+                <h2 style="margin:0; font-size: 1.8rem; display:flex; align-items:center; gap:15px;">
+                    <span style="font-size: 2.5rem;">🧠</span> AI Security Forensics & Recommendations
+                </h2>
+                <div class="rec-list">
+                    {''.join([f'''
+                    <div class="rec-card">
+                        <div class="rec-icon">{'🚨' if r['priority']=='HIGH' else '⚠️'}</div>
+                        <div class="rec-body">
+                            <h4>{r['issue']}</h4>
+                            <div style="font-size: 0.95rem; color: #94a3b8;">{r['fix']}</div>
+                            <div class="rec-fix">Primary Action: Patch and Re-scan in Pipeline</div>
+                        </div>
                     </div>
-                </div>
-                ''' for r in recommendations]) if recommendations else '<p style="color: #22c55e;">No critical security or performance issues found. System is stable.</p>'}
-            </div>
-
-            <div class="details-grid">
-                <div class="card">
-                    <h3>SCA Vulnerabilities (Dependency-Check)</h3>
-                    <table>
-                        <tr><th>Severity</th><th>Count</th></tr>
-                        <tr><td>Critical</td><td>{sca['critical']}</td></tr>
-                        <tr><td>High</td><td>{sca['high']}</td></tr>
-                        <tr><td>Medium</td><td>{sca['medium']}</td></tr>
-                        <tr><td>Low</td><td>{sca['low']}</td></tr>
-                    </table>
-                </div>
-                <div class="card">
-                    <h3>DAST Findings (OWASP ZAP)</h3>
-                    <table>
-                        <tr><th>Risk Level</th><th>Alerts</th></tr>
-                        <tr><td>High</td><td>{zap['high']}</td></tr>
-                        <tr><td>Medium</td><td>{zap['medium']}</td></tr>
-                        <tr><td>Low</td><td>{zap['low']}</td></tr>
-                        <tr><td>Informational</td><td>{zap['informational']}</td></tr>
-                    </table>
-                </div>
-                <div class="card">
-                    <h3>Performance Benchmark (JMeter)</h3>
-                    <table>
-                        <tr><th>Metric</th><th>Value</th></tr>
-                        <tr><td>Total Requests</td><td>{perf['samples']}</td></tr>
-                        <tr><td>Failed Requests</td><td>{perf['errors']}</td></tr>
-                        <tr><td>Average Latency</td><td>{int(perf['avg_rt'])}ms</td></tr>
-                        <tr><td>Max Latency</td><td>{perf['max_rt']}ms</td></tr>
-                    </table>
-                </div>
-                <div class="card">
-                    <h3>SAST Findings (SonarQube)</h3>
-                    <table>
-                        <tr><th>Issue Type</th><th>Count</th></tr>
-                        <tr><td>Critical</td><td>{sonar['critical']}</td></tr>
-                        <tr><td>Major</td><td>{sonar['major']}</td></tr>
-                        <tr><td>Minor</td><td>{sonar['minor']}</td></tr>
-                    </table>
+                    ''' for r in recommendations]) if recommendations else '<p style="color: var(--success); font-size: 1.2rem; padding-top: 20px;">✓ Environment validated. All security and performance gate checks passed.</p>'}
                 </div>
             </div>
 
-            <div class="footer">
-                &copy; DevSecOps Pipeline Automation | Created by Antigravity AI
+            <div class="data-section">
+                <div class="table-wrap">
+                    <h3>SCA Vulnerabilities</h3>
+                    <table>
+                        <tr><th>Severity</th><th>Progress</th><th>Count</th></tr>
+                        <tr><td>Critical</td><td><div class="bar-container"><div class="bar-fill" style="width: {min(100, sca['critical']*20)}%; background: var(--error);"></div></div></td><td>{sca['critical']}</td></tr>
+                        <tr><td>High</td><td><div class="bar-container"><div class="bar-fill" style="width: {min(100, sca['high']*10)}%; background: #f97316;"></div></div></td><td>{sca['high']}</td></tr>
+                        <tr><td>Medium</td><td><div class="bar-container"><div class="bar-fill" style="width: {min(100, sca['medium']*5)}%; background: var(--warning);"></div></div></td><td>{sca['medium']}</td></tr>
+                    </table>
+                </div>
+                <div class="table-wrap">
+                    <h3>DAST (ZAP) Trends</h3>
+                    <table>
+                        <tr><th>Alert Level</th><th>Progress</th><th>Result</th></tr>
+                        <tr><td>High</td><td><div class="bar-container"><div class="bar-fill" style="width: {min(100, zap['high']*25)}%; background: var(--error);"></div></div></td><td>{zap['high']}</td></tr>
+                        <tr><td>Medium</td><td><div class="bar-container"><div class="bar-fill" style="width: {min(100, zap['medium']*10)}%; background: #fb7185;"></div></div></td><td>{zap['medium']}</td></tr>
+                        <tr><td>Low</td><td><div class="bar-container"><div class="bar-fill" style="width: {min(100, zap['low']*5)}%; background: #94a3b8;"></div></div></td><td>{zap['low']}</td></tr>
+                    </table>
+                </div>
             </div>
+            
+            <footer style="text-align: center; margin-top: 80px; padding: 40px; border-top: 1px solid var(--border); color: #475569; font-size: 0.9rem;">
+                DevSecOps AI Insights Engine &copy; 2026 | Powered by Antigravity
+            </footer>
         </div>
     </body>
     </html>
@@ -231,7 +240,7 @@ def generate_dashboard():
     
     with open(OUTPUT_FILE, "w") as f:
         f.write(html_content)
-    print(f"Dashboard generated at: {OUTPUT_FILE}")
+    print(f"Ultra-Premium Dashboard generated at: {OUTPUT_FILE}")
 
 if __name__ == "__main__":
     generate_dashboard()
