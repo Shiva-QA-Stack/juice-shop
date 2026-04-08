@@ -33,21 +33,20 @@ OWASP_TOP10 = {
 
 # CWE → OWASP mapping used by the AI engine
 CWE_TO_OWASP = {
-    "89":  "A03", "564": "A03", "943": "A03",          # Injection
-    "79":  "A03", "80": "A03",                          # XSS → Injection
-    "22":  "A01", "284": "A01", "285": "A01",           # Access Control
-    "326": "A02", "327": "A02", "328": "A02",           # Crypto
+    "89":  "A03", "564": "A03", "943": "A03",
+    "79":  "A03", "80": "A03",
+    "22":  "A01", "284": "A01", "285": "A01",
+    "326": "A02", "327": "A02", "328": "A02",
     "759": "A02", "916": "A02",
-    "287": "A07", "307": "A07", "521": "A07",           # Auth
-    "601": "A01", "639": "A01",                         # IDOR / Redirect
-    "502": "A08", "915": "A08",                         # Deserialization
-    "1021":"A05", "693": "A05", "346": "A05",           # Misconfiguration
-    "200": "A02", "359": "A02",                         # Info Disclosure
-    "918": "A10",                                       # SSRF
-    "400": "A05", "770": "A05",                         # Resource exhaustion
+    "287": "A07", "307": "A07", "521": "A07",
+    "601": "A01", "639": "A01",
+    "502": "A08", "915": "A08",
+    "1021":"A05", "693": "A05", "346": "A05",
+    "200": "A02", "359": "A02",
+    "918": "A10",
+    "400": "A05", "770": "A05",
 }
 
-# ZAP alert name → OWASP mapping
 ZAP_NAME_TO_OWASP = {
     "sql injection":              "A03",
     "xss":                        "A03",
@@ -73,7 +72,6 @@ ZAP_NAME_TO_OWASP = {
     "vulnerable":                 "A06",
 }
 
-# CVE severity rules with OWASP links
 CVE_RULES = {
     "log4j":        {"owasp": "A06", "desc": "Log4Shell RCE", "fix": "Upgrade log4j-core to ≥2.17.1"},
     "spring":       {"owasp": "A06", "desc": "Spring4Shell RCE", "fix": "Upgrade Spring Framework to ≥5.3.18"},
@@ -87,7 +85,6 @@ CVE_RULES = {
     "node-forge":   {"owasp": "A02", "desc": "Crypto weakness", "fix": "Upgrade node-forge to ≥1.3.1"},
 }
 
-# Sonar rule → OWASP mapping
 SONAR_RULE_OWASP = {
     "squid:S2068": "A02",  "squid:S4426": "A02",  "squid:S5542": "A02",
     "squid:S5547": "A02",  "squid:S5659": "A02",  "squid:S2076": "A03",
@@ -195,7 +192,6 @@ def parse_jmeter(filename="jmeter-results.jtl"):
         result["max_rt"]    = all_rt_s[-1]
         result["p95_rt"]    = all_rt_s[min(int(n*0.95), n-1)]
         result["p99_rt"]    = all_rt_s[min(int(n*0.99), n-1)]
-        # Throughput: requests/sec estimated
         result["throughput"] = round(n / max(result["max_rt"]/1000, 1), 2)
         for label, d in ep_data.items():
             ts = sorted(d["times"])
@@ -215,25 +211,18 @@ def parse_jmeter(filename="jmeter-results.jtl"):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FREE AI ENGINE — Expert System
-# Deterministic security intelligence derived from scan results.
-# Covers OWASP Top 10 (2021), CWE mapping, severity correlation,
-# risk scoring, compliance notes and prioritised remediations.
-# Zero API calls. Zero cost.
 # ─────────────────────────────────────────────────────────────────────────────
 class SecurityAI:
-    """Rule-based expert engine that produces AI-quality security analysis."""
-
     def __init__(self, sca, zap, perf, sonar_summary, sonar_issues):
         self.sca    = sca
         self.zap    = zap
         self.perf   = perf
         self.sonar  = sonar_summary
         self.issues = sonar_issues.get("issues", [])
-        self.owasp_hits  = {}   # A0x → list of findings
+        self.owasp_hits  = {}
         self.remediations = []
         self._analyse()
 
-    # ── Core analysis ────────────────────────────────────────────────────────
     def _analyse(self):
         self._map_sca_to_owasp()
         self._map_zap_to_owasp()
@@ -247,7 +236,6 @@ class SecurityAI:
         self.owasp_hits[owasp_id].append({"source": source, **finding})
 
     def _map_sca_to_owasp(self):
-        """Map npm audit / dependency findings to OWASP."""
         for f in self.sca.get("findings", []):
             pkg  = f["package"].lower()
             sev  = f["severity"]
@@ -262,7 +250,6 @@ class SecurityAI:
             })
 
     def _map_zap_to_owasp(self):
-        """Map ZAP alerts to OWASP via CWE or name matching."""
         for f in self.zap.get("findings", []):
             name  = f["name"].lower()
             cweid = str(f.get("cweid",""))
@@ -278,7 +265,6 @@ class SecurityAI:
             })
 
     def _map_sonar_to_owasp(self):
-        """Map SonarQube issues to OWASP."""
         for issue in self.issues:
             rule  = issue.get("rule","")
             owasp = SONAR_RULE_OWASP.get(rule, "A04")
@@ -291,7 +277,6 @@ class SecurityAI:
             })
 
     def _map_perf_risks(self):
-        """Flag performance findings as security-adjacent risks."""
         p95 = self.perf.get("p95_rt", 0)
         err = self.perf.get("errors", 0)
         samples = max(self.perf.get("samples", 1), 1)
@@ -311,22 +296,16 @@ class SecurityAI:
                 "severity": "MEDIUM",
             })
 
-    # ── Risk scoring ─────────────────────────────────────────────────────────
     def score(self):
-        """Compute 0–100 security score using weighted deductions."""
         s = 100
-        # SCA
         s -= self.sca.get("critical", 0) * 12
         s -= self.sca.get("high", 0)     * 6
         s -= self.sca.get("medium", 0)   * 2
-        # SAST
         s -= self.sonar.get("critical", 0) * 10
         s -= self.sonar.get("major",    0) * 3
-        # DAST
         s -= self.zap.get("high",   0) * 15
         s -= self.zap.get("medium", 0) * 5
         s -= self.zap.get("low",    0) * 1
-        # Perf
         if self.perf.get("p95_rt", 0) > 3000: s -= 5
         err = self.perf.get("errors",0)/max(self.perf.get("samples",1),1)*100
         if err > 5: s -= 5
@@ -334,7 +313,7 @@ class SecurityAI:
 
     def grade(self):
         sc = self.score()
-        if sc >= 90: return "A", "#22c55e"
+        if sc >= 90: return "A", "#10b981"
         if sc >= 75: return "B", "#84cc16"
         if sc >= 55: return "C", "#f59e0b"
         if sc >= 35: return "D", "#f97316"
@@ -342,24 +321,21 @@ class SecurityAI:
 
     def risk_level(self):
         sc = self.score()
-        if sc >= 75: return "Low",      "#22c55e"
+        if sc >= 75: return "Low",      "#10b981"
         if sc >= 55: return "Medium",   "#f59e0b"
         if sc >= 35: return "High",     "#f97316"
         return "Critical", "#ef4444"
 
     def build_decision(self):
-        """Fail build if any critical/high issues exist in any tool."""
         if self.sca.get("critical", 0) > 0:   return "FAIL", "Critical CVEs in dependencies"
         if self.sca.get("high", 0) > 0:        return "FAIL", "High-severity CVEs in dependencies"
         if self.zap.get("high", 0) > 0:        return "FAIL", "High-risk DAST alerts"
         if self.sonar.get("critical", 0) > 0:  return "FAIL", "Critical SAST findings"
         return "PASS", "All thresholds met"
 
-    # ── Remediation engine ───────────────────────────────────────────────────
     def _build_remediations(self):
         seen = set()
         priority = 1
-        # Critical CVEs first
         for f in self.sca.get("findings",[]):
             if f["severity"] in ("CRITICAL","HIGH") and f["package"] not in seen:
                 seen.add(f["package"])
@@ -374,7 +350,6 @@ class SecurityAI:
                     "impact":   "Critical",
                 })
                 priority += 1
-        # DAST high
         for f in self.zap.get("findings",[]):
             if f["risk"] == "High" and f["name"] not in seen:
                 seen.add(f["name"])
@@ -388,7 +363,6 @@ class SecurityAI:
                     "impact":   "High",
                 })
                 priority += 1
-        # SAST critical
         for issue in self.issues[:5]:
             msg = issue.get("message","")[:60]
             if msg not in seen:
@@ -404,7 +378,6 @@ class SecurityAI:
                 })
                 priority += 1
 
-    # ── AI narrative ─────────────────────────────────────────────────────────
     def executive_summary(self):
         grade, _ = self.grade()
         risk, _  = self.risk_level()
@@ -460,9 +433,7 @@ class SecurityAI:
         return notes
 
     def ai_insights(self):
-        """Generate tool-specific AI insights."""
         insights = {}
-        # SCA insight
         if self.sca.get("total", 0) > 0:
             crit = self.sca["critical"]
             high = self.sca["high"]
@@ -474,7 +445,6 @@ class SecurityAI:
             )
         else:
             insights["sca"] = "No dependency vulnerabilities found. Maintain this by running `npm audit` on every PR."
-        # ZAP insight
         if self.zap.get("total", 0) > 0:
             insights["dast"] = (
                 f"ZAP full scan produced {self.zap['total']} alerts ({self.zap['high']} high, {self.zap['medium']} medium). "
@@ -484,14 +454,12 @@ class SecurityAI:
             )
         else:
             insights["dast"] = "No active DAST alerts. Ensure ZAP ran against an authenticated session for full coverage."
-        # SAST insight
         crit_sonar = self.sonar.get("critical", 0)
         insights["sast"] = (
             f"SonarQube SAST identified {crit_sonar} critical issue(s). "
             f"{'Critical findings often indicate hardcoded secrets, SQL injection vectors, or insecure crypto — review each rule before dismissing.' if crit_sonar > 0 else 'Code quality gates are passing. Set coverage thresholds ≥80% to prevent regression.'} "
             f"Integrate SonarLint in your IDE for shift-left detection before commit."
         )
-        # Perf insight
         p95 = self.perf.get("p95_rt", 0)
         err = self.perf.get("errors", 0)
         samples = max(self.perf.get("samples", 1), 1)
@@ -505,122 +473,48 @@ class SecurityAI:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HTML Generation — Jenkins CSP-compatible (all inline styles)
-# Premium UI — no external fonts, no CDN, pure inline CSS
+# HTML Generation — Modern Cyberpunk Security Dashboard
+# Uses <style> block + Google Fonts (CDN) for full rendering in Jenkins
 # ─────────────────────────────────────────────────────────────────────────────
-
-# ── Design tokens ────────────────────────────────────────────────────────────
-BG       = "#07090f"      # deepest background
-BG2      = "#0d1117"      # page bg
-BG3      = "#111827"      # card bg
-BG4      = "#1a2236"      # card inner / table rows
-BORDER   = "#1f2d45"      # subtle border
-BORDER2  = "#253352"      # hover border
-TEXT     = "#e2eaf6"      # primary text
-MUTED    = "#6b7fa3"      # secondary text
-DIM      = "#3a4a6b"      # tertiary / disabled
-CYAN     = "#22d3ee"      # brand accent
-PURPLE   = "#a78bfa"      # secondary accent
-GREEN    = "#34d399"       # pass / success
-AMBER    = "#fbbf24"       # warning
-ORANGE   = "#fb923c"       # high severity
-RED      = "#f87171"       # critical / fail
 
 def sev_color(sev):
     s = str(sev).upper()
-    if s in ("CRITICAL","BLOCKER"): return RED
-    if s in ("HIGH",):              return ORANGE
-    if s in ("MEDIUM","MODERATE","MAJOR"): return AMBER
-    return MUTED
+    if s in ("CRITICAL","BLOCKER"): return "#f87171"
+    if s in ("HIGH",):              return "#fb923c"
+    if s in ("MEDIUM","MODERATE","MAJOR"): return "#fbbf24"
+    return "#94a3b8"
 
 def risk_color(r):
     r = str(r).lower()
-    if r == "high":   return RED
-    if r == "medium": return AMBER
-    if r == "low":    return GREEN
-    return MUTED
+    if r == "high":   return "#f87171"
+    if r == "medium": return "#fbbf24"
+    if r == "low":    return "#34d399"
+    return "#94a3b8"
 
-def owasp_badge(owasp_id):
-    info = OWASP_TOP10.get(owasp_id, {"name": "Unknown", "color": DIM})
+def owasp_badge_html(owasp_id):
+    info = OWASP_TOP10.get(owasp_id, {"name": "Unknown", "color": "#475569"})
     c = info["color"]
-    return (
-        f'<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 9px;'
-        f'border-radius:20px;font-size:0.7rem;font-weight:700;letter-spacing:.04em;'
-        f'background:{c}18;color:{c};border:1px solid {c}40;white-space:nowrap;">'
-        f'<span style="width:5px;height:5px;border-radius:50%;background:{c};'
-        f'display:inline-block;flex-shrink:0;"></span>'
-        f'{owasp_id} {info["name"]}</span>'
-    )
+    return f'<span class="owasp-badge" style="--bc:{c}">{owasp_id} {info["name"]}</span>'
 
-def bar(pct, color=CYAN, height="6px", bg=BG):
-    pct = max(0, min(100, pct))
-    glow = f"box-shadow:0 0 6px {color}66;" if pct > 60 else ""
-    return (
-        f'<div style="background:{bg};border-radius:3px;height:{height};'
-        f'overflow:hidden;border:1px solid {BORDER};">'
-        f'<div style="width:{pct}%;background:{color};height:100%;border-radius:3px;{glow}"></div>'
-        f'</div>'
-    )
-
-def glowing_dot(color):
-    return (f'<span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
-            f'background:{color};box-shadow:0 0 6px {color};flex-shrink:0;"></span>')
-
-def section_header(icon, title, accent):
-    return (
-        f'<div style="display:flex;align-items:center;gap:12px;margin:0 0 24px;">'
-        f'<div style="width:3px;height:28px;border-radius:2px;background:{accent};'
-        f'box-shadow:0 0 8px {accent}88;"></div>'
-        f'<span style="font-size:1.15rem;font-weight:700;color:{TEXT};letter-spacing:-.01em;">'
-        f'{icon} {title}</span>'
-        f'</div>'
-    )
-
-def stat_pill(label, value, color, sub=""):
-    sub_html = f'<div style="font-size:0.7rem;color:{DIM};margin-top:3px;">{sub}</div>' if sub else ""
-    return (
-        f'<div style="background:{BG4};border:1px solid {BORDER};border-radius:14px;'
-        f'padding:18px 20px;border-top:2px solid {color};">'
-        f'<div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.1em;'
-        f'color:{MUTED};margin-bottom:8px;">{label}</div>'
-        f'<div style="font-size:1.9rem;font-weight:800;color:{color};line-height:1;">{value}</div>'
-        f'{sub_html}'
-        f'</div>'
-    )
-
-def table_wrap(headers, body_html, min_width="600px"):
-    th_cells = "".join(
-        f'<th style="padding:12px 16px;color:{MUTED};text-align:left;font-size:0.72rem;'
-        f'text-transform:uppercase;letter-spacing:.08em;font-weight:600;'
-        f'border-bottom:1px solid {BORDER};white-space:nowrap;">{h}</th>'
-        for h in headers
-    )
-    return (
-        f'<div style="background:{BG3};border:1px solid {BORDER};border-radius:16px;'
-        f'overflow:hidden;overflow-x:auto;">'
-        f'<table style="width:100%;border-collapse:collapse;min-width:{min_width};">'
-        f'<thead style="background:{BG};"><tr>{th_cells}</tr></thead>'
-        f'<tbody>{body_html}</tbody>'
-        f'</table></div>'
-    )
-
-def td(content, style=""):
-    return f'<td style="padding:13px 16px;border-bottom:1px solid {BORDER};{style}">{content}</td>'
-
-def severity_chip(sev):
+def sev_chip(sev):
     c = sev_color(sev)
-    icons = {"CRITICAL":"◆","BLOCKER":"◆","HIGH":"▲","MEDIUM":"●","MODERATE":"●","MAJOR":"●","LOW":"▼"}
-    icon = icons.get(str(sev).upper(), "●")
-    return (f'<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;'
-            f'border-radius:20px;font-size:0.72rem;font-weight:700;background:{c}18;'
-            f'color:{c};border:1px solid {c}40;">'
-            f'<span style="font-size:8px;">{icon}</span>{sev}</span>')
+    icons = {"CRITICAL":"⬟","BLOCKER":"⬟","HIGH":"▲","MEDIUM":"◆","MODERATE":"◆","MAJOR":"◆","LOW":"▼"}
+    icon = icons.get(str(sev).upper(), "◆")
+    return f'<span class="sev-chip" style="--cc:{c}">{icon} {sev}</span>'
 
+def make_table(headers, rows_html, empty_msg="No data available"):
+    th = "".join(f'<th>{h}</th>' for h in headers)
+    content = rows_html if rows_html else f'<tr><td colspan="{len(headers)}" class="empty-cell">{empty_msg}</td></tr>'
+    return f'''<div class="table-wrap">
+<table><thead><tr>{th}</tr></thead><tbody>{content}</tbody></table>
+</div>'''
+
+def td(content, cls=""):
+    return f'<td class="{cls}">{content}</td>'
 
 def generate_dashboard():
     print("\n=== SHIVA AI — Free Security Intelligence Engine ===")
     print("Loading scan reports...")
-
 
     sca            = parse_npm_audit()
     zap            = parse_zap()
@@ -644,585 +538,962 @@ def generate_dashboard():
     comp      = ai.compliance_notes()
     remeds    = ai.remediations[:8]
     now       = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    print(f"  Score: {score}/100 | Grade: {grade} | Risk: {risk} | Build: {decision}")
-
-    # ── Score ring SVG (bigger, more detailed) ────────────────────────────────
-    R    = 58
-    circ = 2 * 3.14159265 * R
-    dash = circ * score / 100
-    ring_track_col = BG4
-    score_ring = (
-        f'<svg width="160" height="160" viewBox="0 0 160 160">'
-        f'<circle cx="80" cy="80" r="{R}" fill="none" stroke="{ring_track_col}" stroke-width="10"/>'
-        f'<circle cx="80" cy="80" r="{R}" fill="none" stroke="{gc}" stroke-width="10"'
-        f' stroke-dasharray="{dash:.2f} {circ:.2f}" stroke-linecap="round"'
-        f' transform="rotate(-90 80 80)"/>'
-        f'<text x="80" y="71" text-anchor="middle" fill="{gc}"'
-        f' font-size="32" font-weight="900" font-family="system-ui,sans-serif">{score}</text>'
-        f'<text x="80" y="89" text-anchor="middle" fill="{MUTED}"'
-        f' font-size="11" font-family="system-ui,sans-serif">out of 100</text>'
-        f'<text x="80" y="112" text-anchor="middle" fill="{gc}"'
-        f' font-size="18" font-weight="800" font-family="system-ui,sans-serif">Grade {grade}</text>'
-        f'</svg>'
-    )
-
-    # ── OWASP cards ───────────────────────────────────────────────────────────
-    owasp_cards = ""
-    for oid, info in OWASP_TOP10.items():
-        hits = ai.owasp_hits.get(oid, [])
-        cnt  = len(hits)
-        col  = info["color"] if cnt > 0 else DIM
-        bg_t = BG4 if cnt > 0 else BG3
-        hit_list = "".join(
-            f'<div style="display:flex;align-items:flex-start;gap:7px;padding:6px 0;'
-            f'border-bottom:1px solid {BORDER};">'
-            f'<span style="color:{sev_color(h.get("severity","LOW"))};font-size:9px;margin-top:4px;flex-shrink:0;">◆</span>'
-            f'<span style="font-size:0.75rem;color:{TEXT};line-height:1.4;">'
-            f'<span style="color:{MUTED};font-size:0.68rem;text-transform:uppercase;'
-            f'letter-spacing:.06em;margin-right:4px;">[{h["source"]}]</span>'
-            f'{h["title"][:65]}</span></div>'
-            for h in hits[:3]
-        )
-        remaining = cnt - 3
-        more_badge = (
-            f'<div style="font-size:0.7rem;color:{MUTED};padding-top:5px;text-align:right;">'
-            f'+{remaining} more</div>'
-        ) if remaining > 0 else ""
-        owasp_cards += (
-            f'<div style="background:{bg_t};border:1px solid {col if cnt>0 else BORDER};'
-            f'border-radius:14px;padding:18px;border-top:3px solid {col};">'
-            f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-            f'<span style="font-size:0.75rem;font-weight:800;color:{col};letter-spacing:.06em;">{oid}</span>'
-            f'<span style="background:{col}20;color:{col};padding:2px 9px;border-radius:20px;'
-            f'font-size:0.68rem;font-weight:700;border:1px solid {col}40;">'
-            f'{cnt} hit{"s" if cnt!=1 else ""}</span>'
-            f'</div>'
-            f'<div style="font-size:0.78rem;color:{MUTED};margin-bottom:10px;'
-            f'font-weight:500;">{info["name"]}</div>'
-            f'{"<div>" + hit_list + more_badge + "</div>" if hit_list else f"<div style=font-size:0.75rem;color:{DIM};>No findings</div>"}'
-            f'</div>'
-        )
-
-    # ── Remediation rows ──────────────────────────────────────────────────────
-    remed_rows = ""
-    for r in remeds:
-        owasp_id   = r.get("owasp","A04")
-        ic         = sev_color(r["impact"])
-        tool_colors = {"SCA": ORANGE, "DAST": RED, "SAST": PURPLE, "Perf": CYAN}
-        tc = tool_colors.get(r["tool"], MUTED)
-        remed_rows += (
-            f'<tr style="background:{BG3};">'
-            + td(f'<span style="display:inline-flex;align-items:center;justify-content:center;'
-                 f'width:24px;height:24px;border-radius:50%;background:{BORDER2};'
-                 f'color:{CYAN};font-size:0.75rem;font-weight:800;">#{r["priority"]}</span>')
-            + td(f'<span style="display:inline-block;padding:3px 9px;border-radius:6px;'
-                 f'background:{tc}20;color:{tc};font-size:0.72rem;font-weight:700;'
-                 f'border:1px solid {tc}40;">{r["tool"]}</span>')
-            + td(owasp_badge(owasp_id))
-            + td(f'<span style="color:{TEXT};font-size:0.85rem;">{r["issue"][:70]}</span>')
-            + td(f'<span style="color:{MUTED};font-size:0.82rem;line-height:1.5;">{r["fix"][:140]}</span>')
-            + td(severity_chip(r["impact"]))
-            + '</tr>'
-        )
-
-    # ── SCA rows ──────────────────────────────────────────────────────────────
-    sca_rows = ""
-    for idx, f in enumerate(sca.get("findings",[])[:20]):
-        pkg  = f["package"]
-        sev  = f["severity"]
-        cves = ", ".join(f.get("cves",[])) or "—"
-        fix  = f.get("fix","Manual update")
-        rule = next((CVE_RULES[k] for k in CVE_RULES if k in pkg.lower()), None)
-        ow   = owasp_badge(rule["owasp"]) if rule else owasp_badge("A06")
-        row_bg = BG4 if idx % 2 == 0 else BG3
-        sca_rows += (
-            f'<tr style="background:{row_bg};">'
-            + td(f'<span style="font-family:monospace;font-size:0.83rem;color:{CYAN};">{pkg}</span>')
-            + td(severity_chip(sev))
-            + td(f'<span style="font-size:0.78rem;color:{MUTED};font-family:monospace;">{cves[:40]}</span>')
-            + td(ow)
-            + td(f'<span style="font-size:0.8rem;color:{MUTED};">{str(fix)[:80]}</span>')
-            + '</tr>'
-        )
-
-    # ── ZAP rows ──────────────────────────────────────────────────────────────
-    zap_rows = ""
-    for idx, f in enumerate(zap.get("findings",[])[:20]):
-        cw  = f.get("cweid","")
-        ow  = owasp_badge(CWE_TO_OWASP.get(str(cw), next(
-            (v for k,v in ZAP_NAME_TO_OWASP.items() if k in f["name"].lower()), "A05")))
-        urls_html = "".join(
-            f'<div style="font-size:0.72rem;color:{CYAN};word-break:break-all;'
-            f'padding:1px 0;">{u[:70]}</div>'
-            for u in f.get("instances",[])[:2]
-        )
-        row_bg = BG4 if idx % 2 == 0 else BG3
-        zap_rows += (
-            f'<tr style="background:{row_bg};">'
-            + td(f'<span style="color:{TEXT};font-weight:600;font-size:0.85rem;">{f["name"]}</span>')
-            + td(severity_chip(f["risk"]))
-            + td(f'<span style="font-size:0.75rem;color:{DIM};font-family:monospace;">CWE-{cw}</span>')
-            + td(ow)
-            + td(f'<span style="font-size:0.8rem;color:{MUTED};line-height:1.5;">{f.get("solution","")[:100]}</span>')
-            + td(urls_html or f'<span style="color:{DIM};font-size:0.75rem;">—</span>')
-            + '</tr>'
-        )
-
-    # ── Sonar rows ────────────────────────────────────────────────────────────
-    sonar_rows = ""
-    for idx, iss in enumerate(sonar_issues.get("issues",[])[:20]):
-        sev  = iss.get("severity","MAJOR")
-        rule = iss.get("rule","")
-        comp = iss.get("component","").split(":")[-1]
-        ow   = owasp_badge(SONAR_RULE_OWASP.get(rule,"A04"))
-        row_bg = BG4 if idx % 2 == 0 else BG3
-        sonar_rows += (
-            f'<tr style="background:{row_bg};">'
-            + td(f'<span style="color:{TEXT};font-size:0.84rem;">{iss.get("message","")[:85]}</span>')
-            + td(severity_chip(sev))
-            + td(f'<span style="font-family:monospace;font-size:0.78rem;color:{MUTED};">{comp[:40]}</span>')
-            + td(f'<span style="font-family:monospace;font-size:0.72rem;color:{DIM};">{rule}</span>')
-            + td(ow)
-            + '</tr>'
-        )
-
-    # ── Perf rows ─────────────────────────────────────────────────────────────
-    perf_rows = ""
-    for idx, (label, ep) in enumerate(perf.get("endpoints",{}).items()):
-        p95_col = RED   if ep["p95"] > 3000 else AMBER if ep["p95"] > 1500 else GREEN
-        err_col = RED   if ep["error_rate"] > 5       else GREEN
-        pct     = min(100, int(ep["p95"] / 30))
-        row_bg  = BG4 if idx % 2 == 0 else BG3
-        perf_rows += (
-            f'<tr style="background:{row_bg};">'
-            + td(f'<span style="font-family:monospace;font-size:0.83rem;color:{CYAN};">{label}</span>')
-            + td(f'<span style="color:{MUTED};">{ep["count"]}</span>')
-            + td(f'<span style="color:{MUTED};">{round(ep["avg"])}ms</span>')
-            + td(
-                f'<div style="display:flex;align-items:center;gap:10px;">'
-                f'<span style="color:{p95_col};font-weight:700;min-width:52px;">{ep["p95"]}ms</span>'
-                f'<div style="flex:1;min-width:60px;">{bar(pct, p95_col)}</div>'
-                f'</div>'
-              )
-            + td(f'<span style="color:{err_col};font-weight:700;">{ep["error_rate"]}%</span>')
-            + td(f'<span style="color:{MUTED};">{ep["errors"]}</span>')
-            + '</tr>'
-        )
-
-    # ── Compliance rows ───────────────────────────────────────────────────────
-    comp_rows = "".join(
-        f'<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;'
-        f'background:{BG4};border-radius:10px;border-left:3px solid {AMBER};margin-bottom:8px;">'
-        f'<span style="color:{AMBER};font-size:14px;flex-shrink:0;margin-top:1px;">⚠</span>'
-        f'<span style="font-size:0.87rem;color:{TEXT};line-height:1.6;">{note}</span>'
-        f'</div>'
-        for note in comp
-    )
-
-    # ── Decision badge ────────────────────────────────────────────────────────
-    decision_col = GREEN if decision == "PASS" else RED
-    d_icon       = "✓" if decision == "PASS" else "✗"
-
-    # ── Nav link helper ───────────────────────────────────────────────────────
-    def nav_link(href, icon, label, accent=CYAN):
-        return (
-            f'<a href="{href}" style="display:flex;align-items:center;gap:10px;'
-            f'color:{MUTED};text-decoration:none;padding:9px 12px;'
-            f'border-radius:9px;margin-bottom:3px;font-size:0.85rem;'
-            f'border:1px solid transparent;transition:all .15s;">'
-            f'<span style="font-size:13px;">{icon}</span>{label}</a>'
-        )
-
-    # ── Tool badge helper ─────────────────────────────────────────────────────
-    def tool_stat(label, val, sub, col, icon):
-        chk = f'<span style="font-size:10px;color:{col};">{"▲" if col==RED or col==ORANGE else "✓"}</span>'
-        return (
-            f'<div style="background:{BG4};border:1px solid {BORDER};border-radius:14px;'
-            f'padding:20px;border-top:3px solid {col};">'
-            f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-            f'<span style="font-size:0.68rem;text-transform:uppercase;letter-spacing:.1em;color:{MUTED};">{label}</span>'
-            f'{chk}</div>'
-            f'<div style="font-size:2rem;font-weight:900;color:{col};line-height:1;">{val}</div>'
-            f'<div style="font-size:0.72rem;color:{DIM};margin-top:5px;">{sub}</div>'
-            f'</div>'
-        )
-
-    # ── Insight card helper ───────────────────────────────────────────────────
-    def insight_card(icon, title, col, body):
-        return (
-            f'<div style="background:{BG4};border:1px solid {BORDER};border-radius:14px;'
-            f'padding:20px;border-left:3px solid {col};">'
-            f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">'
-            f'{glowing_dot(col)}'
-            f'<span style="font-weight:700;color:{col};font-size:0.9rem;">{icon} {title}</span>'
-            f'</div>'
-            f'<div style="font-size:0.83rem;color:{MUTED};line-height:1.75;">{body}</div>'
-            f'</div>'
-        )
-
     err_rate_val = round(perf["errors"] / max(perf["samples"],1) * 100, 1)
     owasp_hit_count = len(ai.owasp_hits)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # FULL HTML
-    # ─────────────────────────────────────────────────────────────────────────
+    print(f"  Score: {score}/100 | Grade: {grade} | Risk: {risk} | Build: {decision}")
+
+    # Score ring SVG
+    R    = 54
+    circ = 2 * 3.14159265 * R
+    dash = circ * score / 100
+    score_ring = f'''<svg class="score-ring" width="150" height="150" viewBox="0 0 150 150">
+  <circle cx="75" cy="75" r="{R}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+  <circle cx="75" cy="75" r="{R}" fill="none" stroke="{gc}" stroke-width="10"
+    stroke-dasharray="{dash:.2f} {circ:.2f}" stroke-linecap="round"
+    transform="rotate(-90 75 75)" class="ring-arc"/>
+  <text x="75" y="66" text-anchor="middle" fill="{gc}" font-size="30" font-weight="900" font-family="'Space Mono',monospace">{score}</text>
+  <text x="75" y="82" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="10" font-family="'Syne',sans-serif">out of 100</text>
+  <text x="75" y="104" text-anchor="middle" fill="{gc}" font-size="16" font-weight="800" font-family="'Space Mono',monospace">Grade {grade}</text>
+</svg>'''
+
+    # OWASP cards
+    owasp_cards_html = ""
+    for oid, info in OWASP_TOP10.items():
+        hits = ai.owasp_hits.get(oid, [])
+        cnt  = len(hits)
+        col  = info["color"] if cnt > 0 else "rgba(255,255,255,0.1)"
+        hit_items = ""
+        for h in hits[:3]:
+            sc = sev_color(h.get("severity","LOW"))
+            hit_items += f'''<div class="owasp-hit">
+  <span class="hit-dot" style="background:{sc}"></span>
+  <span><em>[{h["source"]}]</em> {h["title"][:60]}</span>
+</div>'''
+        remaining = cnt - 3
+        more = f'<div class="more-badge">+{remaining} more findings</div>' if remaining > 0 else ""
+        empty = '<div class="no-findings">✓ No findings</div>' if not hit_items else ""
+        owasp_cards_html += f'''<div class="owasp-card {'owasp-hit-card' if cnt > 0 else ''}" style="--oc:{col}">
+  <div class="owasp-card-header">
+    <span class="owasp-id">{oid}</span>
+    <span class="owasp-count {'hit-count' if cnt > 0 else ''}">{cnt} hit{'s' if cnt!=1 else ''}</span>
+  </div>
+  <div class="owasp-name">{info["name"]}</div>
+  <div class="owasp-findings">{hit_items}{more}{empty}</div>
+</div>'''
+
+    # Remediation table rows
+    remed_rows = ""
+    tool_cls = {"SCA": "tool-sca", "DAST": "tool-dast", "SAST": "tool-sast", "Perf": "tool-perf"}
+    for r in remeds:
+        tc = tool_cls.get(r["tool"], "tool-sca")
+        remed_rows += f'''<tr>
+  {td(f'<span class="prio-badge">#{r["priority"]}</span>')}
+  {td(f'<span class="tool-badge {tc}">{r["tool"]}</span>')}
+  {td(owasp_badge_html(r.get("owasp","A04")))}
+  {td(f'<span class="finding-text">{r["issue"][:70]}</span>')}
+  {td(f'<span class="fix-text">{r["fix"][:140]}</span>')}
+  {td(sev_chip(r["impact"]))}
+</tr>'''
+
+    # SCA rows
+    sca_rows = ""
+    for f in sca.get("findings",[])[:20]:
+        pkg  = f["package"]
+        rule = next((CVE_RULES[k] for k in CVE_RULES if k in pkg.lower()), None)
+        cves = ", ".join(f.get("cves",[])) or "—"
+        sca_rows += f'''<tr>
+  {td(f'<code class="pkg-name">{pkg}</code>')}
+  {td(sev_chip(f["severity"]))}
+  {td(f'<code class="cve-text">{cves[:40]}</code>')}
+  {td(owasp_badge_html(rule["owasp"] if rule else "A06"))}
+  {td(f'<span class="fix-text">{str(f.get("fix","Manual update"))[:80]}</span>')}
+</tr>'''
+
+    # ZAP rows
+    zap_rows = ""
+    for f in zap.get("findings",[])[:20]:
+        cw  = f.get("cweid","")
+        ow_id = CWE_TO_OWASP.get(str(cw), next((v for k,v in ZAP_NAME_TO_OWASP.items() if k in f["name"].lower()), "A05"))
+        urls_html = "".join(f'<div class="url-item">{u[:70]}</div>' for u in f.get("instances",[])[:2])
+        zap_rows += f'''<tr>
+  {td(f'<strong class="alert-name">{f["name"]}</strong>')}
+  {td(sev_chip(f["risk"]))}
+  {td(f'<code class="cwe-text">CWE-{cw}</code>')}
+  {td(owasp_badge_html(ow_id))}
+  {td(f'<span class="fix-text">{f.get("solution","")[:100]}</span>')}
+  {td(urls_html or '<span class="dim-text">—</span>')}
+</tr>'''
+
+    # Sonar rows
+    sonar_rows = ""
+    for iss in sonar_issues.get("issues",[])[:20]:
+        rule = iss.get("rule","")
+        comp = iss.get("component","").split(":")[-1]
+        sonar_rows += f'''<tr>
+  {td(f'<span class="finding-text">{iss.get("message","")[:85]}</span>')}
+  {td(sev_chip(iss.get("severity","MAJOR")))}
+  {td(f'<code class="pkg-name">{comp[:40]}</code>')}
+  {td(f'<code class="cwe-text">{rule}</code>')}
+  {td(owasp_badge_html(SONAR_RULE_OWASP.get(rule,"A04")))}
+</tr>'''
+
+    # Perf rows
+    perf_rows = ""
+    for label, ep in perf.get("endpoints",{}).items():
+        p95_col = "#f87171" if ep["p95"] > 3000 else "#fbbf24" if ep["p95"] > 1500 else "#34d399"
+        err_col = "#f87171" if ep["error_rate"] > 5 else "#34d399"
+        pct     = min(100, int(ep["p95"] / 30))
+        perf_rows += f'''<tr>
+  {td(f'<code class="pkg-name">{label}</code>')}
+  {td(f'<span class="dim-text">{ep["count"]}</span>')}
+  {td(f'<span class="dim-text">{round(ep["avg"])}ms</span>')}
+  {td(f'''<div class="perf-bar-wrap">
+    <span style="color:{p95_col};font-weight:700;min-width:60px;font-family:\'Space Mono\',monospace">{ep["p95"]}ms</span>
+    <div class="perf-bar"><div class="perf-fill" style="width:{pct}%;background:{p95_col}"></div></div>
+  </div>''')}
+  {td(f'<span style="color:{err_col};font-weight:700;font-family:\'Space Mono\',monospace">{ep["error_rate"]}%</span>')}
+  {td(f'<span class="dim-text">{ep["errors"]}</span>')}
+</tr>'''
+
+    # Compliance rows
+    comp_html = "".join(
+        f'<div class="compliance-item"><span class="comp-icon">⚠</span><span>{note}</span></div>'
+        for note in comp
+    ) or '<div class="compliance-item no-comp"><span class="comp-icon ok">✓</span><span>No active compliance violations detected.</span></div>'
+
+    d_class = "pass" if decision == "PASS" else "fail"
+    d_icon = "✓" if decision == "PASS" else "✗"
+
+    # ─── CSS ─────────────────────────────────────────────────────────────────
+    css = f"""
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+*, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
+:root {{
+  --bg0: #050811;
+  --bg1: #080d18;
+  --bg2: #0c1222;
+  --bg3: #111827;
+  --bg4: #162032;
+  --border: #1e2d47;
+  --border2: #2a3f5f;
+  --text: #e2eaf6;
+  --muted: #64748b;
+  --dim: #334155;
+  --cyan: #22d3ee;
+  --cyan2: #06b6d4;
+  --purple: #a78bfa;
+  --green: #34d399;
+  --amber: #fbbf24;
+  --orange: #fb923c;
+  --red: #f87171;
+  --font-display: 'Syne', sans-serif;
+  --font-mono: 'Space Mono', 'JetBrains Mono', monospace;
+  --glow-cyan: 0 0 20px rgba(34,211,238,0.15), 0 0 40px rgba(34,211,238,0.08);
+  --glow-red:  0 0 20px rgba(248,113,113,0.2);
+}}
+
+html {{ scroll-behavior: smooth; }}
+
+body {{
+  background: var(--bg0);
+  color: var(--text);
+  font-family: var(--font-display);
+  min-height: 100vh;
+  line-height: 1.6;
+  overflow-x: hidden;
+}}
+
+/* Grid noise background */
+body::before {{
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(34,211,238,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34,211,238,0.015) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}}
+
+/* ── TOPBAR ── */
+.topbar {{
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(5,8,17,0.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px;
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 68px; flex-wrap: wrap; gap: 12px;
+}}
+
+.topbar-left {{ display: flex; align-items: center; gap: 16px; padding: 14px 0; }}
+
+.logo-box {{
+  width: 42px; height: 42px; border-radius: 12px;
+  background: linear-gradient(135deg, rgba(34,211,238,0.2), rgba(167,139,250,0.1));
+  border: 1px solid rgba(34,211,238,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  box-shadow: var(--glow-cyan);
+}}
+
+.logo-title {{
+  font-size: 1.1rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text);
+}}
+.logo-title span {{
+  font-size: 0.65rem; font-weight: 500; color: var(--muted);
+  letter-spacing: 0.1em; text-transform: uppercase; margin-left: 8px;
+}}
+.logo-meta {{
+  font-size: 0.72rem; color: var(--dim); margin-top: 2px; font-family: var(--font-mono);
+}}
+.logo-meta a {{ color: var(--cyan); text-decoration: none; }}
+.logo-meta a:hover {{ text-decoration: underline; }}
+
+.topbar-right {{ display: flex; align-items: center; gap: 10px; padding: 14px 0; flex-wrap: wrap; }}
+
+.status-pill {{
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 18px; text-align: center;
+  transition: border-color 0.2s;
+}}
+.status-pill:hover {{ border-color: var(--border2); }}
+.status-pill .sp-label {{
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--dim); margin-bottom: 3px;
+}}
+.status-pill .sp-value {{
+  font-size: 1.05rem; font-weight: 900; font-family: var(--font-mono);
+}}
+.status-pill.pass {{ border-color: rgba(52,211,153,0.4); background: rgba(52,211,153,0.05); }}
+.status-pill.fail {{ border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.05); }}
+
+/* ── LAYOUT ── */
+.layout {{ display: flex; min-height: calc(100vh - 68px); position: relative; z-index: 1; }}
+
+/* ── SIDEBAR ── */
+.sidebar {{
+  width: 240px; flex-shrink: 0;
+  background: rgba(8,13,24,0.8);
+  border-right: 1px solid var(--border);
+  padding: 28px 14px;
+  display: flex; flex-direction: column; gap: 2px;
+  position: sticky; top: 68px; height: calc(100vh - 68px); overflow-y: auto;
+}}
+
+.nav-label {{
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--dim); padding: 0 10px; margin-bottom: 10px;
+}}
+
+.nav-link {{
+  display: flex; align-items: center; gap: 10px;
+  color: var(--muted); text-decoration: none;
+  padding: 10px 12px; border-radius: 10px;
+  font-size: 0.85rem; font-weight: 600; border: 1px solid transparent;
+  transition: all 0.18s; margin-bottom: 2px;
+}}
+.nav-link:hover {{
+  color: var(--text);
+  background: rgba(34,211,238,0.06);
+  border-color: rgba(34,211,238,0.15);
+}}
+.nav-link .nav-icon {{ font-size: 13px; width: 18px; text-align: center; }}
+
+.sidebar-score {{
+  margin-top: auto; padding-top: 24px;
+  border-top: 1px solid var(--border); text-align: center;
+}}
+.sidebar-score-label {{
+  font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--dim); margin-bottom: 12px;
+}}
+.ring-arc {{ transition: stroke-dasharray 1s ease; }}
+
+.sidebar-footer {{
+  text-align: center; padding: 16px 6px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.66rem; color: var(--dim); line-height: 2;
+  font-family: var(--font-mono);
+}}
+
+/* ── MAIN ── */
+.main {{ flex: 1; padding: 40px 48px; overflow-x: hidden; max-width: 1300px; }}
+
+/* ── SECTION HEADER ── */
+.section-header {{
+  display: flex; align-items: center; gap: 14px; margin-bottom: 28px;
+}}
+.section-bar {{
+  width: 3px; height: 30px; border-radius: 2px;
+}}
+.section-title {{
+  font-size: 1.15rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em;
+}}
+.section {{ margin-bottom: 60px; scroll-margin-top: 28px; }}
+
+/* ── STAT GRID ── */
+.stat-grid {{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 14px; margin-bottom: 16px;
+}}
+
+.stat-card {{
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 16px; padding: 20px;
+  border-top: 2px solid var(--border);
+  transition: transform 0.2s, border-color 0.2s;
+  position: relative; overflow: hidden;
+}}
+.stat-card::before {{
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--c, var(--cyan)), transparent);
+  opacity: 0.5;
+}}
+.stat-card:hover {{ transform: translateY(-2px); }}
+
+.stat-label {{
+  font-size: 0.63rem; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--muted); margin-bottom: 10px; display: flex;
+  align-items: center; justify-content: space-between;
+}}
+.stat-value {{
+  font-size: 2.1rem; font-weight: 900; line-height: 1;
+  font-family: var(--font-mono);
+}}
+.stat-sub {{
+  font-size: 0.68rem; color: var(--dim); margin-top: 6px;
+}}
+
+/* ── DIST BAR CARD ── */
+.dist-card {{
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 16px; padding: 24px;
+}}
+.dist-label-row {{
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); margin-bottom: 20px;
+}}
+.dist-grid {{
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 18px;
+}}
+.dist-item-label {{
+  display: flex; justify-content: space-between;
+  font-size: 0.8rem; margin-bottom: 6px;
+}}
+.dist-bar-track {{
+  background: var(--bg0); border-radius: 4px; height: 7px;
+  overflow: hidden; border: 1px solid var(--border);
+}}
+.dist-bar-fill {{
+  height: 100%; border-radius: 4px;
+  transition: width 1s cubic-bezier(0.4,0,0.2,1);
+}}
+
+/* ── AI ANALYSIS ── */
+.summary-card {{
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 18px; padding: 28px; margin-bottom: 18px;
+}}
+.summary-header {{
+  display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap;
+}}
+.summary-title {{
+  font-weight: 800; font-size: 0.95rem; color: var(--text);
+}}
+.summary-risk-badge {{
+  margin-left: auto; padding: 4px 14px; border-radius: 20px;
+  font-size: 0.72rem; font-weight: 700; border: 1px solid;
+}}
+.summary-body {{
+  font-size: 0.88rem; line-height: 1.9; color: var(--muted);
+  background: var(--bg4); padding: 20px 22px; border-radius: 12px;
+  border-left: 3px solid var(--cyan);
+}}
+
+.insight-grid {{
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(270px,1fr)); gap: 16px;
+}}
+.insight-card {{
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 16px; padding: 22px;
+  border-left: 3px solid var(--border);
+  transition: transform 0.2s;
+}}
+.insight-card:hover {{ transform: translateY(-2px); }}
+.insight-header {{
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}}
+.insight-dot {{
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+}}
+.insight-title {{
+  font-weight: 700; font-size: 0.9rem;
+}}
+.insight-body {{
+  font-size: 0.83rem; line-height: 1.8; color: var(--muted);
+}}
+
+/* glowing dot */
+.glow-dot {{
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}}
+
+/* ── OWASP GRID ── */
+.owasp-grid {{
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(235px,1fr)); gap: 14px;
+}}
+.owasp-card {{
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 14px; padding: 18px;
+  border-top: 3px solid var(--oc);
+  transition: transform 0.2s, box-shadow 0.2s;
+}}
+.owasp-hit-card {{
+  box-shadow: 0 0 0 1px var(--oc, transparent);
+}}
+.owasp-card:hover {{ transform: translateY(-2px); }}
+.owasp-card-header {{
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+}}
+.owasp-id {{
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em;
+  color: var(--oc); font-family: var(--font-mono);
+}}
+.owasp-count {{
+  font-size: 0.68rem; font-weight: 700; padding: 2px 9px;
+  border-radius: 20px; background: rgba(255,255,255,0.05);
+  color: var(--muted); border: 1px solid var(--border);
+}}
+.owasp-count.hit-count {{
+  background: color-mix(in srgb, var(--oc) 15%, transparent);
+  color: var(--oc); border-color: color-mix(in srgb, var(--oc) 35%, transparent);
+}}
+.owasp-name {{ font-size: 0.78rem; color: var(--muted); margin-bottom: 12px; font-weight: 500; }}
+.owasp-hit {{
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+  font-size: 0.74rem; color: var(--text); line-height: 1.5;
+}}
+.owasp-hit:last-child {{ border-bottom: none; }}
+.owasp-hit em {{
+  color: var(--muted); font-style: normal; text-transform: uppercase;
+  font-size: 0.64rem; letter-spacing: 0.06em; margin-right: 3px;
+}}
+.hit-dot {{
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
+}}
+.no-findings {{ font-size: 0.75rem; color: var(--dim); padding: 6px 0; }}
+.more-badge {{
+  font-size: 0.7rem; color: var(--muted); text-align: right; padding-top: 6px;
+}}
+
+/* ── TABLES ── */
+.table-wrap {{
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 18px; overflow: hidden; overflow-x: auto;
+}}
+table {{ width: 100%; border-collapse: collapse; min-width: 600px; }}
+thead {{ background: var(--bg0); }}
+th {{
+  padding: 13px 16px; text-align: left;
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
+  font-weight: 700; color: var(--muted); white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+}}
+td {{
+  padding: 13px 16px; border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}}
+tr:last-child td {{ border-bottom: none; }}
+tr:nth-child(even) {{ background: rgba(255,255,255,0.015); }}
+tr:hover {{ background: rgba(34,211,238,0.03); }}
+
+.empty-cell {{
+  text-align: center; color: var(--dim); font-size: 0.85rem; padding: 28px;
+}}
+
+/* ── BADGES & CHIPS ── */
+.owasp-badge {{
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 20px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  background: color-mix(in srgb, var(--bc) 12%, transparent);
+  color: var(--bc);
+  border: 1px solid color-mix(in srgb, var(--bc) 30%, transparent);
+  white-space: nowrap;
+}}
+
+.sev-chip {{
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 0.7rem; font-weight: 800;
+  background: color-mix(in srgb, var(--cc) 12%, transparent);
+  color: var(--cc);
+  border: 1px solid color-mix(in srgb, var(--cc) 30%, transparent);
+  font-family: var(--font-mono);
+}}
+
+.prio-badge {{
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--bg4); border: 1px solid var(--border2);
+  color: var(--cyan); font-size: 0.72rem; font-weight: 800;
+  font-family: var(--font-mono);
+}}
+
+.tool-badge {{
+  display: inline-block; padding: 3px 10px; border-radius: 7px;
+  font-size: 0.7rem; font-weight: 800; letter-spacing: 0.04em;
+  font-family: var(--font-mono);
+}}
+.tool-sca  {{ background: rgba(251,146,60,0.15); color: #fb923c; border: 1px solid rgba(251,146,60,0.3); }}
+.tool-dast {{ background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }}
+.tool-sast {{ background: rgba(167,139,250,0.15); color: #a78bfa; border: 1px solid rgba(167,139,250,0.3); }}
+.tool-perf {{ background: rgba(34,211,238,0.15);  color: #22d3ee; border: 1px solid rgba(34,211,238,0.3); }}
+
+/* ── TEXT TYPES ── */
+.pkg-name  {{ font-family: var(--font-mono); font-size: 0.83rem; color: var(--cyan); }}
+.cve-text  {{ font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); }}
+.cwe-text  {{ font-family: var(--font-mono); font-size: 0.73rem; color: var(--dim); }}
+.fix-text  {{ font-size: 0.82rem; color: var(--muted); line-height: 1.55; }}
+.finding-text {{ font-size: 0.85rem; color: var(--text); }}
+.alert-name {{ font-size: 0.85rem; color: var(--text); font-weight: 700; }}
+.dim-text {{ color: var(--dim); font-size: 0.82rem; }}
+.url-item {{ font-size: 0.72rem; color: var(--cyan); word-break: break-all; padding: 1px 0; }}
+
+/* ── MINI STAT STRIP ── */
+.mini-stats {{ display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }}
+.mini-stat {{
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+  font-size: 0.8rem; color: var(--muted);
+}}
+.mini-stat strong {{ font-family: var(--font-mono); font-size: 0.85rem; }}
+
+/* ── PERF STATS ── */
+.perf-stat-grid {{
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px,1fr));
+  gap: 12px; margin-bottom: 18px;
+}}
+.perf-stat {{
+  background: var(--bg4); border: 1px solid var(--border); border-radius: 13px; padding: 18px;
+}}
+.perf-stat-label {{
+  font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--muted); margin-bottom: 8px;
+}}
+.perf-stat-value {{
+  font-size: 1.6rem; font-weight: 900; font-family: var(--font-mono);
+}}
+.perf-bar-wrap {{ display: flex; align-items: center; gap: 10px; }}
+.perf-bar {{
+  flex: 1; min-width: 60px; height: 7px;
+  background: var(--bg0); border-radius: 4px; overflow: hidden;
+  border: 1px solid var(--border);
+}}
+.perf-fill {{ height: 100%; border-radius: 4px; }}
+
+/* ── COMPLIANCE ── */
+.compliance-card {{
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 18px; padding: 28px;
+}}
+.comp-tags {{ display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }}
+.comp-tag {{
+  background: rgba(251,191,36,0.1); color: var(--amber);
+  border: 1px solid rgba(251,191,36,0.3);
+  padding: 3px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 700;
+}}
+.compliance-item {{
+  display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px;
+  background: var(--bg4); border-radius: 10px;
+  border-left: 3px solid var(--amber); margin-bottom: 10px;
+  font-size: 0.87rem; color: var(--text); line-height: 1.65;
+}}
+.compliance-item.no-comp {{ border-left-color: var(--green); }}
+.comp-icon {{ color: var(--amber); font-size: 15px; flex-shrink: 0; margin-top: 1px; }}
+.comp-icon.ok {{ color: var(--green); }}
+
+/* ── FOOTER ── */
+.footer {{
+  text-align: center; padding: 32px 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.7rem; color: var(--dim); line-height: 2.2;
+  font-family: var(--font-mono);
+}}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {{
+  from {{ opacity: 0; transform: translateY(16px); }}
+  to   {{ opacity: 1; transform: translateY(0); }}
+}}
+.section {{ animation: fadeUp 0.5s ease both; }}
+.stat-card {{ animation: fadeUp 0.4s ease both; }}
+
+@keyframes pulse {{
+  0%, 100% {{ opacity: 1; }}
+  50% {{ opacity: 0.5; }}
+}}
+.live-dot {{ animation: pulse 2s infinite; }}
+"""
+
+    # ─── HTML ─────────────────────────────────────────────────────────────────
     html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>SHIVA AI &#x2022; Build #{BUILD_NUMBER}</title>
+<title>SHIVA AI &bull; Build #{BUILD_NUMBER}</title>
+<style>{css}</style>
 </head>
-<body style="background:{BG2};color:{TEXT};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;margin:0;padding:0;min-height:100vh;">
+<body>
 
-<!-- ═══════════════════════════════ TOP BAR ═══════════════════════════════ -->
-<div style="background:{BG};border-bottom:1px solid {BORDER};padding:0 32px;
-            display:flex;align-items:stretch;justify-content:space-between;
-            min-height:64px;flex-wrap:wrap;gap:0;">
-
-  <!-- Logo + meta -->
-  <div style="display:flex;align-items:center;gap:16px;padding:14px 0;">
-    <div style="width:38px;height:38px;border-radius:10px;background:{CYAN}18;
-                border:1px solid {CYAN}40;display:flex;align-items:center;
-                justify-content:center;font-size:20px;">🛡️</div>
+<!-- ═══════════════════ TOP BAR ═══════════════════ -->
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="logo-box">🛡️</div>
     <div>
-      <div style="font-size:1rem;font-weight:800;color:{TEXT};letter-spacing:-.02em;">
-        SHIVA AI
-        <span style="font-size:0.7rem;font-weight:500;color:{MUTED};margin-left:6px;
-                     letter-spacing:.04em;text-transform:uppercase;">Security Intelligence</span>
-      </div>
-      <div style="font-size:0.72rem;color:{DIM};margin-top:1px;">
-        {JOB_NAME} &nbsp;&#x2022;&nbsp; Build #{BUILD_NUMBER} &nbsp;&#x2022;&nbsp;
-        {now} &nbsp;&#x2022;&nbsp;
-        <a href="{BUILD_URL}" style="color:{CYAN};text-decoration:none;">Jenkins &#x2197;</a>
+      <div class="logo-title">SHIVA AI <span>Security Intelligence</span></div>
+      <div class="logo-meta">
+        {JOB_NAME} &bull; Build #{BUILD_NUMBER} &bull; {now} &bull;
+        <a href="{BUILD_URL}">Jenkins ↗</a>
       </div>
     </div>
   </div>
-
-  <!-- Status pills -->
-  <div style="display:flex;align-items:center;gap:10px;padding:14px 0;flex-wrap:wrap;">
-    <div style="background:{decision_col}15;border:1px solid {decision_col}50;
-                border-radius:10px;padding:10px 18px;text-align:center;">
-      <div style="font-size:0.65rem;color:{DIM};text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px;">Build</div>
-      <div style="font-size:1.1rem;font-weight:900;color:{decision_col};">{d_icon} {decision}</div>
+  <div class="topbar-right">
+    <div class="status-pill {d_class}">
+      <div class="sp-label">Build</div>
+      <div class="sp-value" style="color:{'var(--green)' if decision=='PASS' else 'var(--red)'}">{d_icon} {decision}</div>
     </div>
-    <div style="background:{rc}15;border:1px solid {rc}50;
-                border-radius:10px;padding:10px 18px;text-align:center;">
-      <div style="font-size:0.65rem;color:{DIM};text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px;">Risk</div>
-      <div style="font-size:1.1rem;font-weight:900;color:{rc};">{risk}</div>
+    <div class="status-pill">
+      <div class="sp-label">Risk</div>
+      <div class="sp-value" style="color:{rc}">{risk}</div>
     </div>
-    <div style="background:{gc}15;border:1px solid {gc}50;
-                border-radius:10px;padding:10px 18px;text-align:center;">
-      <div style="font-size:0.65rem;color:{DIM};text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px;">Grade</div>
-      <div style="font-size:1.1rem;font-weight:900;color:{gc};">{grade} &nbsp;<span style="font-size:0.75rem;color:{MUTED};">({score}/100)</span></div>
+    <div class="status-pill">
+      <div class="sp-label">Grade</div>
+      <div class="sp-value" style="color:{gc}">{grade} <small style="font-size:0.7rem;color:var(--muted)">({score}/100)</small></div>
     </div>
-    <div style="background:{BORDER};border:1px solid {BORDER2};
-                border-radius:10px;padding:10px 18px;text-align:center;">
-      <div style="font-size:0.65rem;color:{DIM};text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px;">OWASP Hits</div>
-      <div style="font-size:1.1rem;font-weight:900;color:{AMBER};">{owasp_hit_count}/10</div>
+    <div class="status-pill">
+      <div class="sp-label">OWASP Hits</div>
+      <div class="sp-value" style="color:var(--amber)">{owasp_hit_count}/10</div>
     </div>
   </div>
-</div>
+</header>
 
-<!-- ═══════════════════════════ LAYOUT ═══════════════════════════════════ -->
-<div style="display:flex;min-height:calc(100vh - 64px);">
+<!-- ═══════════════════ LAYOUT ═══════════════════ -->
+<div class="layout">
 
-  <!-- ─── SIDEBAR ─────────────────────────────────────────────────────── -->
-  <div style="width:230px;flex-shrink:0;background:{BG};border-right:1px solid {BORDER};
-              padding:24px 14px;display:flex;flex-direction:column;gap:2px;">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="nav-label">Navigation</div>
+    <a class="nav-link" href="#overview"><span class="nav-icon">◈</span>Overview</a>
+    <a class="nav-link" href="#ai-analysis"><span class="nav-icon">◎</span>AI Analysis</a>
+    <a class="nav-link" href="#owasp"><span class="nav-icon">⬡</span>OWASP Top 10</a>
+    <a class="nav-link" href="#remediations"><span class="nav-icon">⬢</span>Remediations</a>
+    <a class="nav-link" href="#sast"><span class="nav-icon">◉</span>SAST — Sonar</a>
+    <a class="nav-link" href="#sca"><span class="nav-icon">◈</span>SCA — npm</a>
+    <a class="nav-link" href="#dast"><span class="nav-icon">◎</span>DAST — ZAP</a>
+    <a class="nav-link" href="#perf"><span class="nav-icon">⚡</span>Performance</a>
+    <a class="nav-link" href="#compliance"><span class="nav-icon">⬢</span>Compliance</a>
 
-    <div style="font-size:0.65rem;color:{DIM};text-transform:uppercase;letter-spacing:.12em;
-                padding:0 6px;margin-bottom:8px;">Navigation</div>
-
-    {nav_link("#overview",    "◈", "Overview",       CYAN)}
-    {nav_link("#ai-analysis", "◎", "AI Analysis",    PURPLE)}
-    {nav_link("#owasp",       "⬡", "OWASP Top 10",   AMBER)}
-    {nav_link("#remediations","⬢", "Remediations",   GREEN)}
-    {nav_link("#sast",        "◉", "SAST — Sonar",   PURPLE)}
-    {nav_link("#sca",         "◈", "SCA — npm",      ORANGE)}
-    {nav_link("#dast",        "◎", "DAST — ZAP",     RED)}
-    {nav_link("#perf",        "⬡", "Performance",    CYAN)}
-    {nav_link("#compliance",  "⬢", "Compliance",     AMBER)}
-
-    <!-- Score ring -->
-    <div style="margin-top:auto;padding-top:24px;border-top:1px solid {BORDER};text-align:center;">
-      <div style="font-size:0.65rem;color:{DIM};text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Security Score</div>
+    <div class="sidebar-score">
+      <div class="sidebar-score-label">Security Score</div>
       {score_ring}
     </div>
-
-    <div style="text-align:center;padding:16px 6px 0;border-top:1px solid {BORDER};
-                font-size:0.68rem;color:{DIM};line-height:1.8;">
+    <div class="sidebar-footer">
       Free AI Engine v3.0<br>
       OWASP Top 10 (2021)<br>
-      CWE Mapping &#x2022; Zero cost
+      CWE Mapping &bull; Zero cost
     </div>
-  </div>
+  </nav>
 
-  <!-- ─── MAIN CONTENT ─────────────────────────────────────────────────── -->
-  <div style="flex:1;padding:36px 44px;overflow-x:hidden;max-width:1300px;">
+  <!-- MAIN -->
+  <main class="main">
 
     <!-- ══ OVERVIEW ══ -->
-    <div id="overview" style="margin-bottom:56px;scroll-margin-top:24px;">
-      {section_header("◈", "Executive Overview", CYAN)}
-
-      <!-- Metric grid -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:14px;">
-        {tool_stat("SAST Criticals", sonar_summary.get("critical",0), "Gate = 0", RED if sonar_summary.get("critical",0)>0 else GREEN, "🔍")}
-        {tool_stat("SCA Critical",   sca["critical"],  f'{sca["total"]} total CVEs', RED if sca["critical"]>0 else GREEN, "📦")}
-        {tool_stat("SCA High",       sca["high"],      f'{sca["medium"]} medium', ORANGE if sca["high"]>0 else GREEN, "📦")}
-        {tool_stat("DAST High",      zap["high"],      f'{zap["total"]} total alerts', RED if zap["high"]>0 else GREEN, "🕷️")}
-        {tool_stat("P95 Latency",    f'{perf["p95_rt"]}ms', "Gate ≤ 2000ms", RED if perf["p95_rt"]>2000 else GREEN, "⚡")}
-        {tool_stat("Error Rate",     f'{err_rate_val}%', "Gate ≤ 5%", RED if err_rate_val>5 else GREEN, "⚡")}
+    <section id="overview" class="section">
+      <div class="section-header">
+        <div class="section-bar" style="background:var(--cyan);box-shadow:0 0 10px rgba(34,211,238,0.5)"></div>
+        <span class="section-title">◈ Executive Overview</span>
       </div>
 
-      <!-- Severity distribution bars -->
-      <div style="background:{BG3};border:1px solid {BORDER};border-radius:14px;padding:20px;">
-        <div style="font-size:0.72rem;color:{MUTED};text-transform:uppercase;letter-spacing:.09em;margin-bottom:16px;">Severity distribution across all tools</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;">
+      <div class="stat-grid">
+        <div class="stat-card" style="--c:{'var(--red)' if sonar_summary.get('critical',0)>0 else 'var(--green)'}">
+          <div class="stat-label">SAST Criticals <span style="color:{'var(--red)' if sonar_summary.get('critical',0)>0 else 'var(--green)'}">{'▲' if sonar_summary.get('critical',0)>0 else '✓'}</span></div>
+          <div class="stat-value" style="color:{'var(--red)' if sonar_summary.get('critical',0)>0 else 'var(--green)'}">{sonar_summary.get("critical",0)}</div>
+          <div class="stat-sub">Gate = 0</div>
+        </div>
+        <div class="stat-card" style="--c:{'var(--red)' if sca['critical']>0 else 'var(--green)'}">
+          <div class="stat-label">SCA Critical <span style="color:{'var(--red)' if sca['critical']>0 else 'var(--green)'}">{'▲' if sca['critical']>0 else '✓'}</span></div>
+          <div class="stat-value" style="color:{'var(--red)' if sca['critical']>0 else 'var(--green)'}">{sca["critical"]}</div>
+          <div class="stat-sub">{sca["total"]} total CVEs</div>
+        </div>
+        <div class="stat-card" style="--c:{'var(--orange)' if sca['high']>0 else 'var(--green)'}">
+          <div class="stat-label">SCA High <span style="color:{'var(--orange)' if sca['high']>0 else 'var(--green)'}">{'▲' if sca['high']>0 else '✓'}</span></div>
+          <div class="stat-value" style="color:{'var(--orange)' if sca['high']>0 else 'var(--green)'}">{sca["high"]}</div>
+          <div class="stat-sub">{sca["medium"]} medium</div>
+        </div>
+        <div class="stat-card" style="--c:{'var(--red)' if zap['high']>0 else 'var(--green)'}">
+          <div class="stat-label">DAST High <span style="color:{'var(--red)' if zap['high']>0 else 'var(--green)'}">{'▲' if zap['high']>0 else '✓'}</span></div>
+          <div class="stat-value" style="color:{'var(--red)' if zap['high']>0 else 'var(--green)'}">{zap["high"]}</div>
+          <div class="stat-sub">{zap["total"]} total alerts</div>
+        </div>
+        <div class="stat-card" style="--c:{'var(--red)' if perf['p95_rt']>2000 else 'var(--green)'}">
+          <div class="stat-label">P95 Latency <span style="color:{'var(--red)' if perf['p95_rt']>2000 else 'var(--green)'}">{'▲' if perf['p95_rt']>2000 else '✓'}</span></div>
+          <div class="stat-value" style="color:{'var(--red)' if perf['p95_rt']>2000 else 'var(--green)'};">{perf["p95_rt"]}ms</div>
+          <div class="stat-sub">Gate ≤ 2000ms</div>
+        </div>
+        <div class="stat-card" style="--c:{'var(--red)' if err_rate_val>5 else 'var(--green)'}">
+          <div class="stat-label">Error Rate <span style="color:{'var(--red)' if err_rate_val>5 else 'var(--green)'}">{'▲' if err_rate_val>5 else '✓'}</span></div>
+          <div class="stat-value" style="color:{'var(--red)' if err_rate_val>5 else 'var(--green)'}">{err_rate_val}%</div>
+          <div class="stat-sub">Gate ≤ 5%</div>
+        </div>
+      </div>
+
+      <div class="dist-card">
+        <div class="dist-label-row">Severity distribution across all tools</div>
+        <div class="dist-grid">
           <div>
-            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:5px;">
-              <span style="color:{RED};font-weight:600;">Critical</span>
-              <span style="color:{TEXT};">{sca["critical"] + sonar_summary.get("critical",0)}</span>
+            <div class="dist-item-label">
+              <span style="color:var(--red);font-weight:700">Critical</span>
+              <span style="color:var(--text);font-family:var(--font-mono)">{sca["critical"] + sonar_summary.get("critical",0)}</span>
             </div>
-            {bar(min(100, (sca["critical"]+sonar_summary.get("critical",0))*8), RED)}
+            <div class="dist-bar-track"><div class="dist-bar-fill" style="width:{min(100,(sca['critical']+sonar_summary.get('critical',0))*8)}%;background:var(--red)"></div></div>
           </div>
           <div>
-            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:5px;">
-              <span style="color:{ORANGE};font-weight:600;">High</span>
-              <span style="color:{TEXT};">{sca["high"] + zap["high"]}</span>
+            <div class="dist-item-label">
+              <span style="color:var(--orange);font-weight:700">High</span>
+              <span style="color:var(--text);font-family:var(--font-mono)">{sca["high"] + zap["high"]}</span>
             </div>
-            {bar(min(100, (sca["high"]+zap["high"])*5), ORANGE)}
+            <div class="dist-bar-track"><div class="dist-bar-fill" style="width:{min(100,(sca['high']+zap['high'])*5)}%;background:var(--orange)"></div></div>
           </div>
           <div>
-            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:5px;">
-              <span style="color:{AMBER};font-weight:600;">Medium</span>
-              <span style="color:{TEXT};">{sca["medium"] + zap["medium"]}</span>
+            <div class="dist-item-label">
+              <span style="color:var(--amber);font-weight:700">Medium</span>
+              <span style="color:var(--text);font-family:var(--font-mono)">{sca["medium"] + zap["medium"]}</span>
             </div>
-            {bar(min(100, (sca["medium"]+zap["medium"])*3), AMBER)}
+            <div class="dist-bar-track"><div class="dist-bar-fill" style="width:{min(100,(sca['medium']+zap['medium'])*3)}%;background:var(--amber)"></div></div>
           </div>
           <div>
-            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:5px;">
-              <span style="color:{GREEN};font-weight:600;">Low</span>
-              <span style="color:{TEXT};">{sca["low"] + zap["low"]}</span>
+            <div class="dist-item-label">
+              <span style="color:var(--green);font-weight:700">Low</span>
+              <span style="color:var(--text);font-family:var(--font-mono)">{sca["low"] + zap["low"]}</span>
             </div>
-            {bar(min(100, (sca["low"]+zap["low"])*2), GREEN)}
+            <div class="dist-bar-track"><div class="dist-bar-fill" style="width:{min(100,(sca['low']+zap['low'])*2)}%;background:var(--green)"></div></div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
     <!-- ══ AI ANALYSIS ══ -->
-    <div id="ai-analysis" style="margin-bottom:56px;scroll-margin-top:24px;">
-      {section_header("◎", "AI Security Analysis — Expert Engine", PURPLE)}
+    <section id="ai-analysis" class="section">
+      <div class="section-header">
+        <div class="section-bar" style="background:var(--purple);box-shadow:0 0 10px rgba(167,139,250,0.5)"></div>
+        <span class="section-title">◎ AI Security Analysis — Expert Engine</span>
+      </div>
 
-      <!-- Executive summary card -->
-      <div style="background:{BG3};border:1px solid {BORDER};border-radius:16px;padding:24px;margin-bottom:16px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-          {glowing_dot(CYAN)}
-          <span style="font-weight:700;color:{TEXT};font-size:0.95rem;">Executive Summary</span>
-          <span style="margin-left:auto;background:{rc}18;color:{rc};padding:3px 12px;
-                       border-radius:20px;font-size:0.72rem;font-weight:700;border:1px solid {rc}40;">
-            {risk} Risk &#x2022; {decision}</span>
+      <div class="summary-card">
+        <div class="summary-header">
+          <span class="glow-dot live-dot" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span>
+          <span class="summary-title">Executive Summary</span>
+          <span class="summary-risk-badge" style="color:{rc};border-color:{rc};background:color-mix(in srgb,{rc} 10%,transparent)">
+            {risk} Risk &bull; {decision}
+          </span>
         </div>
-        <div style="font-size:0.88rem;color:{MUTED};line-height:1.85;
-                    background:{BG4};padding:18px 20px;border-radius:10px;
-                    border-left:3px solid {CYAN};">{summary}</div>
+        <div class="summary-body">{summary}</div>
       </div>
 
-      <!-- Insight cards -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px;">
-        {insight_card("📦", "SCA Intelligence",  ORANGE, insights["sca"])}
-        {insight_card("🕷️", "DAST Intelligence", RED,    insights["dast"])}
-        {insight_card("🔍", "SAST Intelligence", PURPLE, insights["sast"])}
-        {insight_card("⚡", "Perf Intelligence", CYAN,   insights["perf"])}
+      <div class="insight-grid">
+        <div class="insight-card" style="border-left-color:var(--orange)">
+          <div class="insight-header">
+            <span class="insight-dot" style="background:var(--orange);box-shadow:0 0 8px var(--orange)"></span>
+            <span class="insight-title" style="color:var(--orange)">📦 SCA Intelligence</span>
+          </div>
+          <div class="insight-body">{insights["sca"]}</div>
+        </div>
+        <div class="insight-card" style="border-left-color:var(--red)">
+          <div class="insight-header">
+            <span class="insight-dot" style="background:var(--red);box-shadow:0 0 8px var(--red)"></span>
+            <span class="insight-title" style="color:var(--red)">🕷️ DAST Intelligence</span>
+          </div>
+          <div class="insight-body">{insights["dast"]}</div>
+        </div>
+        <div class="insight-card" style="border-left-color:var(--purple)">
+          <div class="insight-header">
+            <span class="insight-dot" style="background:var(--purple);box-shadow:0 0 8px var(--purple)"></span>
+            <span class="insight-title" style="color:var(--purple)">🔍 SAST Intelligence</span>
+          </div>
+          <div class="insight-body">{insights["sast"]}</div>
+        </div>
+        <div class="insight-card" style="border-left-color:var(--cyan)">
+          <div class="insight-header">
+            <span class="insight-dot" style="background:var(--cyan);box-shadow:0 0 8px var(--cyan)"></span>
+            <span class="insight-title" style="color:var(--cyan)">⚡ Perf Intelligence</span>
+          </div>
+          <div class="insight-body">{insights["perf"]}</div>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <!-- ══ OWASP TOP 10 ══ -->
-    <div id="owasp" style="margin-bottom:56px;scroll-margin-top:24px;">
-      {section_header("⬡", "OWASP Top 10 (2021) Coverage Map", AMBER)}
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;">
-        {owasp_cards}
+    <!-- ══ OWASP ══ -->
+    <section id="owasp" class="section">
+      <div class="section-header">
+        <div class="section-bar" style="background:var(--amber);box-shadow:0 0 10px rgba(251,191,36,0.5)"></div>
+        <span class="section-title">⬡ OWASP Top 10 (2021) Coverage Map</span>
       </div>
-    </div>
+      <div class="owasp-grid">{owasp_cards_html}</div>
+    </section>
 
     <!-- ══ REMEDIATIONS ══ -->
-    <div id="remediations" style="margin-bottom:56px;scroll-margin-top:24px;">
-      {section_header("⬢", "AI-Prioritised Remediation Plan", GREEN)}
-      {table_wrap(
+    <section id="remediations" class="section">
+      <div class="section-header">
+        <div class="section-bar" style="background:var(--green);box-shadow:0 0 10px rgba(52,211,153,0.5)"></div>
+        <span class="section-title">⬢ AI-Prioritised Remediation Plan</span>
+      </div>
+      {make_table(
         ["#", "Tool", "OWASP", "Issue", "Recommended Fix", "Impact"],
-        remed_rows or f'<tr><td colspan="6" style="padding:24px;text-align:center;color:{DIM};font-size:0.85rem;">No remediation items — excellent security posture!</td></tr>',
-        "700px"
+        remed_rows,
+        "No remediation items — excellent security posture!"
       )}
-    </div>
+    </section>
 
     <!-- ══ SAST ══ -->
-    <div id="sast" style="margin-bottom:56px;scroll-margin-top:24px;">
-      {section_header("◉", "SAST — SonarQube Findings", PURPLE)}
-      <!-- Mini stat strip -->
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(RED)}
-          <span style="font-size:0.8rem;color:{MUTED};">Critical:</span>
-          <span style="font-size:0.85rem;font-weight:700;color:{RED};">{sonar_summary.get("critical",0)}</span>
+    <section id="sast" class="section">
+      <div class="section-header">
+        <div class="section-bar" style="background:var(--purple);box-shadow:0 0 10px rgba(167,139,250,0.5)"></div>
+        <span class="section-title">◉ SAST — SonarQube Findings</span>
+      </div>
+      <div class="mini-stats">
+        <div class="mini-stat">
+          <span class="glow-dot" style="background:var(--red)"></span>
+          Critical: <strong style="color:var(--red)">{sonar_summary.get("critical",0)}</strong>
         </div>
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(AMBER)}
-          <span style="font-size:0.8rem;color:{MUTED};">Major:</span>
-          <span style="font-size:0.85rem;font-weight:700;color:{AMBER};">{sonar_summary.get("major",0)}</span>
+        <div class="mini-stat">
+          <span class="glow-dot" style="background:var(--amber)"></span>
+          Major: <strong style="color:var(--amber)">{sonar_summary.get("major",0)}</strong>
         </div>
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(CYAN)}
-          <span style="font-size:0.8rem;color:{MUTED};">Gate status:</span>
-          <span style="font-size:0.85rem;font-weight:700;color:{GREEN if sonar_summary.get('critical',0)==0 else RED};">
-            {"OK" if sonar_summary.get("critical",0)==0 else "FAILED"}</span>
+        <div class="mini-stat">
+          <span class="glow-dot" style="background:var(--cyan)"></span>
+          Gate: <strong style="color:{'var(--green)' if sonar_summary.get('critical',0)==0 else 'var(--red)'}">{'OK' if sonar_summary.get('critical',0)==0 else 'FAILED'}</strong>
         </div>
       </div>
-      {table_wrap(
+      {make_table(
         ["Message", "Severity", "File", "Rule ID", "OWASP"],
-        sonar_rows or f'<tr><td colspan="5" style="padding:24px;text-align:center;color:{DIM};">No critical/major issues found</td></tr>',
-        "700px"
+        sonar_rows,
+        "No critical/major issues found"
       )}
-    </div>
+    </section>
 
     <!-- ══ SCA ══ -->
-    <div id="sca" style="margin-bottom:56px;scroll-margin-top:24px;">
-      {section_header("◈", "SCA — Dependency Vulnerabilities (npm audit)", ORANGE)}
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(RED)}
-          <span style="font-size:0.8rem;color:{MUTED};">Critical: <strong style="color:{RED};">{sca["critical"]}</strong></span>
-        </div>
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(ORANGE)}
-          <span style="font-size:0.8rem;color:{MUTED};">High: <strong style="color:{ORANGE};">{sca["high"]}</strong></span>
-        </div>
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(AMBER)}
-          <span style="font-size:0.8rem;color:{MUTED};">Medium: <strong style="color:{AMBER};">{sca["medium"]}</strong></span>
-        </div>
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(GREEN)}
-          <span style="font-size:0.8rem;color:{MUTED};">Low: <strong style="color:{GREEN};">{sca["low"]}</strong></span>
-        </div>
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(MUTED)}
-          <span style="font-size:0.8rem;color:{MUTED};">Total: <strong style="color:{TEXT};">{sca["total"]}</strong></span>
-        </div>
+    <section id="sca" class="section">
+      <div class="section-header">
+        <div class="section-bar" style="background:var(--orange);box-shadow:0 0 10px rgba(251,146,60,0.5)"></div>
+        <span class="section-title">◈ SCA — Dependency Vulnerabilities (npm audit)</span>
       </div>
-      {table_wrap(
+      <div class="mini-stats">
+        <div class="mini-stat"><span class="glow-dot" style="background:var(--red)"></span>Critical: <strong style="color:var(--red)">{sca["critical"]}</strong></div>
+        <div class="mini-stat"><span class="glow-dot" style="background:var(--orange)"></span>High: <strong style="color:var(--orange)">{sca["high"]}</strong></div>
+        <div class="mini-stat"><span class="glow-dot" style="background:var(--amber)"></span>Medium: <strong style="color:var(--amber)">{sca["medium"]}</strong></div>
+        <div class="mini-stat"><span class="glow-dot" style="background:var(--green)"></span>Low: <strong style="color:var(--green)">{sca["low"]}</strong></div>
+        <div class="mini-stat"><span class="glow-dot" style="background:var(--muted)"></span>Total: <strong style="color:var(--text)">{sca["total"]}</strong></div>
+      </div>
+      {make_table(
         ["Package", "Severity", "CVEs", "OWASP", "Fix"],
-        sca_rows or f'<tr><td colspan="5" style="padding:24px;text-align:center;color:{DIM};">No dependency vulnerabilities found</td></tr>',
-        "680px"
+        sca_rows,
+        "No dependency vulnerabilities found"
       )}
-    </div>
+    </section>
 
     <!-- ══ DAST ══ -->
-    <div id="dast" style="margin-bottom:56px;scroll-margin-top:24px;">
-      {section_header("◎", "DAST — OWASP ZAP Active Scan Results", RED)}
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(RED)}
-          <span style="font-size:0.8rem;color:{MUTED};">High: <strong style="color:{RED};">{zap["high"]}</strong></span>
-        </div>
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(AMBER)}
-          <span style="font-size:0.8rem;color:{MUTED};">Medium: <strong style="color:{AMBER};">{zap["medium"]}</strong></span>
-        </div>
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(GREEN)}
-          <span style="font-size:0.8rem;color:{MUTED};">Low: <strong style="color:{GREEN};">{zap["low"]}</strong></span>
-        </div>
-        <div style="background:{BG3};border:1px solid {BORDER};border-radius:10px;padding:10px 16px;
-                    display:flex;align-items:center;gap:8px;">
-          {glowing_dot(MUTED)}
-          <span style="font-size:0.8rem;color:{MUTED};">Total: <strong style="color:{TEXT};">{zap["total"]}</strong></span>
-        </div>
+    <section id="dast" class="section">
+      <div class="section-header">
+        <div class="section-bar" style="background:var(--red);box-shadow:0 0 10px rgba(248,113,113,0.5)"></div>
+        <span class="section-title">◎ DAST — OWASP ZAP Active Scan Results</span>
       </div>
-      {table_wrap(
+      <div class="mini-stats">
+        <div class="mini-stat"><span class="glow-dot" style="background:var(--red)"></span>High: <strong style="color:var(--red)">{zap["high"]}</strong></div>
+        <div class="mini-stat"><span class="glow-dot" style="background:var(--amber)"></span>Medium: <strong style="color:var(--amber)">{zap["medium"]}</strong></div>
+        <div class="mini-stat"><span class="glow-dot" style="background:var(--green)"></span>Low: <strong style="color:var(--green)">{zap["low"]}</strong></div>
+        <div class="mini-stat"><span class="glow-dot" style="background:var(--muted)"></span>Total: <strong style="color:var(--text)">{zap["total"]}</strong></div>
+      </div>
+      {make_table(
         ["Alert", "Risk", "CWE", "OWASP", "Remediation", "Affected URLs"],
-        zap_rows or f'<tr><td colspan="6" style="padding:24px;text-align:center;color:{DIM};">No ZAP alerts found</td></tr>',
-        "820px"
+        zap_rows,
+        "No ZAP alerts found"
       )}
-    </div>
+    </section>
 
     <!-- ══ PERFORMANCE ══ -->
-    <div id="perf" style="margin-bottom:56px;scroll-margin-top:24px;">
-      {section_header("⚡", "Performance — JMeter Load Test Results", CYAN)}
+    <section id="perf" class="section">
+      <div class="section-header">
+        <div class="section-bar" style="background:var(--cyan);box-shadow:0 0 10px rgba(34,211,238,0.5)"></div>
+        <span class="section-title">⚡ Performance — JMeter Load Test Results</span>
+      </div>
 
-      <!-- Summary stat strip -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px;">
-        <div style="background:{BG4};border:1px solid {BORDER};border-radius:12px;padding:16px;">
-          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.09em;color:{MUTED};margin-bottom:6px;">Samples</div>
-          <div style="font-size:1.6rem;font-weight:800;color:{TEXT};">{perf["samples"]}</div>
+      <div class="perf-stat-grid">
+        <div class="perf-stat">
+          <div class="perf-stat-label">Samples</div>
+          <div class="perf-stat-value" style="color:var(--text)">{perf["samples"]}</div>
         </div>
-        <div style="background:{BG4};border:1px solid {BORDER};border-radius:12px;padding:16px;">
-          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.09em;color:{MUTED};margin-bottom:6px;">Avg RT</div>
-          <div style="font-size:1.6rem;font-weight:800;color:{TEXT};">{round(perf["avg_rt"])}ms</div>
+        <div class="perf-stat">
+          <div class="perf-stat-label">Avg RT</div>
+          <div class="perf-stat-value" style="color:var(--text)">{round(perf["avg_rt"])}ms</div>
         </div>
-        <div style="background:{BG4};border:1px solid {BORDER};border-radius:12px;padding:16px;
-                    border-top:3px solid {RED if perf["p95_rt"]>2000 else GREEN};">
-          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.09em;color:{MUTED};margin-bottom:6px;">P95</div>
-          <div style="font-size:1.6rem;font-weight:800;color:{RED if perf["p95_rt"]>2000 else GREEN};">{perf["p95_rt"]}ms</div>
+        <div class="perf-stat" style="border-top:2px solid {'var(--red)' if perf['p95_rt']>2000 else 'var(--green)'}">
+          <div class="perf-stat-label">P95</div>
+          <div class="perf-stat-value" style="color:{'var(--red)' if perf['p95_rt']>2000 else 'var(--green)'}">{perf["p95_rt"]}ms</div>
         </div>
-        <div style="background:{BG4};border:1px solid {BORDER};border-radius:12px;padding:16px;">
-          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.09em;color:{MUTED};margin-bottom:6px;">P99</div>
-          <div style="font-size:1.6rem;font-weight:800;color:{TEXT};">{perf["p99_rt"]}ms</div>
+        <div class="perf-stat">
+          <div class="perf-stat-label">P99</div>
+          <div class="perf-stat-value" style="color:var(--text)">{perf["p99_rt"]}ms</div>
         </div>
-        <div style="background:{BG4};border:1px solid {BORDER};border-radius:12px;padding:16px;">
-          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.09em;color:{MUTED};margin-bottom:6px;">Throughput</div>
-          <div style="font-size:1.6rem;font-weight:800;color:{CYAN};">{perf["throughput"]}/s</div>
+        <div class="perf-stat">
+          <div class="perf-stat-label">Throughput</div>
+          <div class="perf-stat-value" style="color:var(--cyan)">{perf["throughput"]}/s</div>
         </div>
-        <div style="background:{BG4};border:1px solid {BORDER};border-radius:12px;padding:16px;
-                    border-top:3px solid {RED if perf["errors"]>0 else GREEN};">
-          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.09em;color:{MUTED};margin-bottom:6px;">Errors</div>
-          <div style="font-size:1.6rem;font-weight:800;color:{RED if perf["errors"]>0 else GREEN};">{perf["errors"]}</div>
+        <div class="perf-stat" style="border-top:2px solid {'var(--red)' if perf['errors']>0 else 'var(--green)'}">
+          <div class="perf-stat-label">Errors</div>
+          <div class="perf-stat-value" style="color:{'var(--red)' if perf['errors']>0 else 'var(--green)'}">{perf["errors"]}</div>
         </div>
       </div>
 
-      {table_wrap(
-        ["Endpoint", "Samples", "Avg RT", "P95 + bar", "Error %", "Errors"],
-        perf_rows or f'<tr><td colspan="6" style="padding:24px;text-align:center;color:{DIM};">No JMeter data available</td></tr>',
-        "600px"
+      {make_table(
+        ["Endpoint", "Samples", "Avg RT", "P95 + Bar", "Error %", "Errors"],
+        perf_rows,
+        "No JMeter data available"
       )}
-    </div>
+    </section>
 
     <!-- ══ COMPLIANCE ══ -->
-    <div id="compliance" style="margin-bottom:56px;scroll-margin-top:24px;">
-      {section_header("⬢", "Compliance & Regulatory Notes", AMBER)}
-      <div style="background:{BG3};border:1px solid {BORDER};border-radius:16px;padding:24px;">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
-          {"".join(f'<span style="background:{AMBER}18;color:{AMBER};border:1px solid {AMBER}40;'
-                   f'padding:3px 10px;border-radius:20px;font-size:0.7rem;font-weight:600;">{tag}</span>'
-                   for tag in ["OWASP Top 10 (2021)","PCI-DSS","GDPR","NIST SP 800-190","CWE"])}
-        </div>
-        {comp_rows or f'<div style="color:{DIM};font-size:0.85rem;">No compliance violations detected.</div>'}
+    <section id="compliance" class="section">
+      <div class="section-header">
+        <div class="section-bar" style="background:var(--amber);box-shadow:0 0 10px rgba(251,191,36,0.5)"></div>
+        <span class="section-title">⬢ Compliance &amp; Regulatory Notes</span>
       </div>
-    </div>
+      <div class="compliance-card">
+        <div class="comp-tags">
+          {''.join(f'<span class="comp-tag">{t}</span>' for t in ["OWASP Top 10 (2021)","PCI-DSS","GDPR","NIST SP 800-190","CWE"])}
+        </div>
+        {comp_html}
+      </div>
+    </section>
 
-    <!-- Footer -->
-    <div style="text-align:center;padding:28px 0;border-top:1px solid {BORDER};
-                font-size:0.72rem;color:{DIM};line-height:2;">
-      SHIVA AI Security Intelligence Suite v3.0 &nbsp;&#x2022;&nbsp;
-      Free Expert Engine &nbsp;&#x2022;&nbsp; Build #{BUILD_NUMBER}<br>
-      Zero API cost &nbsp;&#x2022;&nbsp; OWASP Top 10 (2021) &nbsp;&#x2022;&nbsp;
-      CWE Mapping &nbsp;&#x2022;&nbsp; Deterministic Analysis
-    </div>
+    <footer class="footer">
+      SHIVA AI Security Intelligence Suite v3.0 &bull;
+      Free Expert Engine &bull; Build #{BUILD_NUMBER}<br>
+      Zero API cost &bull; OWASP Top 10 (2021) &bull;
+      CWE Mapping &bull; Deterministic Analysis
+    </footer>
 
-  </div><!-- /main -->
-</div><!-- /layout -->
+  </main>
+</div>
 </body>
 </html>"""
 
